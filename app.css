@@ -265,8 +265,12 @@ a.cab {
   height: 100%;
 }
 .pswp-video video {
+  width: 100%;
+  height: auto;
   max-width: 100%;
   max-height: 90vh;
+  object-fit: contain;
+  background: #000;
 }
 .cab h2, .box h2 { margin: 0 0 8px; font-size: 22px; font-weight: 600; }
 .meta { color: var(--mute); font-size: 14px; line-height: 1.45; }

@@ -22,7 +22,7 @@
     }
   }
 
-  function bindThumb(img, url) {
+  function bindThumb(img, url, onReady) {
     let tries = 0;
     function start(done) {
       function settle() {
@@ -32,6 +32,7 @@
       }
       function onLoad() {
         settle();
+        if (onReady) onReady();
       }
       function onErr() {
         settle();
@@ -68,13 +69,18 @@
 
   function slideFor(item, tile) {
     const tileUrl = qs(item, "thumb");
+    const img = tile && tile.querySelector("img");
+    const w = (img && img.naturalWidth) || 1600;
+    const h = (img && img.naturalHeight) || 1067;
     if (item.kind === "video") {
       const src = qs(item, "media");
       return {
         html:
-          '<div class="pswp-video"><video src="' +
+          '<div class="pswp-video"><video controls playsinline webkit-playsinline preload="none" poster="' +
+          tileUrl.replace(/"/g, "") +
+          '" data-src="' +
           src.replace(/"/g, "") +
-          '" controls playsinline></video></div>',
+          '"></video></div>',
         msrc: tileUrl,
         width: 1920,
         height: 1080,
@@ -84,8 +90,8 @@
     return {
       src: qs(item, "thumb"),
       msrc: tileUrl,
-      width: 1600,
-      height: 1600,
+      width: w,
+      height: h,
       alt: item.who,
       element: tile,
       thumbCropped: true,
@@ -106,8 +112,28 @@
     lightbox.addFilter("itemData", function (itemData, index) {
       return (lightbox._slides && lightbox._slides[index]) || itemData;
     });
+    lightbox.on("contentLoad", function (evt) {
+      const el = evt.content && evt.content.element;
+      const video = el && el.querySelector && el.querySelector("video[data-src]");
+      if (!video) return;
+      if (!video.getAttribute("src")) {
+        video.src = video.getAttribute("data-src");
+        video.load();
+      }
+    });
     lightbox.on("change", function () {
       if (!lightbox.pswp || !lightbox._slides) return;
+      document.querySelectorAll(".pswp-video video").forEach(function (v) {
+        const on = v.closest(".pswp__item") && v.closest(".pswp__item").getAttribute("aria-hidden") !== "true";
+        if (!on) {
+          v.pause();
+          return;
+        }
+        if (!v.getAttribute("src") && v.getAttribute("data-src")) {
+          v.src = v.getAttribute("data-src");
+          v.load();
+        }
+      });
       if (lightbox.pswp.currIndex >= lightbox._slides.length - 5 && lightbox._nearEnd) {
         lightbox._nearEnd();
       }
@@ -150,7 +176,13 @@
         const img = document.createElement("img");
         img.decoding = "async";
         img.alt = item.who;
-        bindThumb(img, qs(item, "thumb"));
+        bindThumb(img, qs(item, "thumb"), function () {
+          const slide = slides[index];
+          if (slide && img.naturalWidth && img.naturalHeight) {
+            slide.width = img.naturalWidth;
+            slide.height = img.naturalHeight;
+          }
+        });
         a.appendChild(img);
         a.addEventListener("click", function (ev) {
           ev.preventDefault();

@@ -13,6 +13,8 @@
   let openPerson = "";
   let names = {};
   let lastCab = "";
+  let coverInput = null;
+  let coverPerson = "";
 
   function api(path) {
     return ORIGIN + path;
@@ -71,32 +73,51 @@
   }
 
   function pickCover(person) {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.addEventListener("change", async function () {
-      const file = input.files && input.files[0];
-      if (!file) return;
-      const body = new FormData();
-      body.append("cover", file, file.name || "cover.jpg");
-      try {
-        const res = await fetch(api("/api/cover?person=" + encodeURIComponent(person)), {
-          method: "POST",
-          body: body,
-        });
-        const data = await res.json().catch(function () {
-          return {};
-        });
-        if (!res.ok) throw new Error(data.error || "fail");
-        boot();
-      } catch (err) {
-        fail("封面換不上，請確認家裡這台有開");
-      }
-    });
-    input.click();
+    coverPerson = person;
+    if (!coverInput) {
+      coverInput = document.createElement("input");
+      coverInput.type = "file";
+      coverInput.accept = "image/*";
+      coverInput.setAttribute("aria-hidden", "true");
+      coverInput.style.cssText =
+        "position:fixed;left:0;top:0;width:1px;height:1px;opacity:0.01;pointer-events:none;";
+      document.body.appendChild(coverInput);
+      coverInput.addEventListener("change", function () {
+        const file = coverInput.files && coverInput.files[0];
+        const who = coverPerson;
+        coverInput.value = "";
+        if (!file || !who) return;
+        uploadCover(who, file);
+      });
+    }
+    coverInput.value = "";
+    coverInput.click();
+  }
+
+  async function uploadCover(person, file) {
+    const body = new FormData();
+    body.append("cover", file, file.name || "cover.jpg");
+    fail("正在換封面…");
+    try {
+      const res = await fetch(api("/api/cover?person=" + encodeURIComponent(person)), {
+        method: "POST",
+        body: body,
+      });
+      const data = await res.json().catch(function () {
+        return {};
+      });
+      if (!res.ok) throw new Error(data.error || "fail");
+      lastCab = "";
+      await boot();
+      if (statusEl && statusEl.textContent === "正在換封面…") statusEl.textContent = "";
+    } catch (err) {
+      fail("封面換不上，請再選一次，或確認家裡這台有開");
+    }
   }
 
   function cabCard(p) {
+    const wrap = document.createElement("div");
+    wrap.className = "cab-wrap";
     const a = document.createElement("a");
     a.className = "cab" + (p.has_cover ? " has-cover" : "");
     a.href = "#" + p.id;
@@ -116,16 +137,6 @@
       empty.textContent = p.display_name;
       cover.appendChild(empty);
     }
-    const pick = document.createElement("button");
-    pick.type = "button";
-    pick.className = "cab-pick";
-    pick.textContent = p.has_cover ? "換封面" : "選封面";
-    pick.addEventListener("click", function (ev) {
-      ev.preventDefault();
-      ev.stopPropagation();
-      pickCover(p.id);
-    });
-    cover.appendChild(pick);
     if (p.sync === "synced") {
       const mark = document.createElement("div");
       mark.className = "cab-sync";
@@ -147,6 +158,7 @@
           })
           .then(function (x) {
             if (!x.res.ok) throw new Error(x.j.error || "fail");
+            lastCab = "";
             boot();
           })
           .catch(function () {
@@ -158,7 +170,18 @@
       attachBusy(cover, p);
     }
     a.appendChild(cover);
-    return a;
+    const pick = document.createElement("button");
+    pick.type = "button";
+    pick.className = "cab-pick";
+    pick.textContent = p.has_cover ? "換封面" : "選封面";
+    pick.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      pickCover(p.id);
+    });
+    wrap.appendChild(a);
+    wrap.appendChild(pick);
+    return wrap;
   }
 
   function attachBusy(cover, p) {

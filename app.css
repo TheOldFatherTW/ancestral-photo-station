@@ -137,6 +137,9 @@ a.cab {
   padding: 0;
   min-height: 0;
 }
+.cab-wrap {
+  position: relative;
+}
 .cab-cover {
   position: relative;
   aspect-ratio: 1;
@@ -177,7 +180,7 @@ a.cab {
   right: 8px;
   background: rgba(255, 255, 255, 0.94);
   color: var(--ink);
-  z-index: 2;
+  z-index: 3;
 }
 .cab-now {
   position: absolute;

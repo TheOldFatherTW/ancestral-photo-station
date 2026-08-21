@@ -40,8 +40,7 @@
   }
 
   function detailScale(time) {
-    const pulse =
-      (time % CONFIG.pulseDurationMs) / CONFIG.pulseDurationMs;
+    const pulse = (time % CONFIG.pulseDurationMs) / CONFIG.pulseDurationMs;
     return 0.52 + ((Math.sin(pulse * Math.PI * 2 + 0.55) + 1) / 2) * 0.48;
   }
 
@@ -65,7 +64,8 @@
   }
 
   function mount(root) {
-    if (!root) return;
+    if (!root || root.getAttribute("data-rose") === "on") return;
+    root.setAttribute("data-rose", "on");
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const svg = document.createElementNS(SVG_NS, "svg");
     svg.setAttribute("viewBox", "0 0 100 100");
@@ -97,6 +97,7 @@
 
     const start = performance.now();
     function tick(now) {
+      if (!root.isConnected) return;
       const time = now - start;
       const progress = (time % CONFIG.durationMs) / CONFIG.durationMs;
       const scale = detailScale(time);
@@ -113,6 +114,79 @@
     }
     window.requestAnimationFrame(tick);
   }
+
+  function mountBar(root, readRatio) {
+    if (!root || root.getAttribute("data-rose-bar") === "on") return;
+    root.setAttribute("data-rose-bar", "on");
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("viewBox", "0 0 100 12");
+    svg.setAttribute("preserveAspectRatio", "none");
+    svg.setAttribute("class", "rose-bar-svg");
+    svg.setAttribute("aria-hidden", "true");
+    const track = document.createElementNS(SVG_NS, "path");
+    track.setAttribute("d", "M 2 6 L 98 6");
+    track.setAttribute("fill", "none");
+    track.setAttribute("stroke", "currentColor");
+    track.setAttribute("stroke-width", "3.2");
+    track.setAttribute("stroke-linecap", "round");
+    track.setAttribute("opacity", "0.14");
+    const fill = document.createElementNS(SVG_NS, "path");
+    fill.setAttribute("fill", "none");
+    fill.setAttribute("stroke", "currentColor");
+    fill.setAttribute("stroke-width", "3.2");
+    fill.setAttribute("stroke-linecap", "round");
+    fill.setAttribute("opacity", "0.92");
+    svg.appendChild(track);
+    svg.appendChild(fill);
+    const count = 28;
+    const dots = [];
+    if (!reduce) {
+      for (let i = 0; i < count; i++) {
+        const c = document.createElementNS(SVG_NS, "circle");
+        c.setAttribute("fill", "currentColor");
+        svg.appendChild(c);
+        dots.push(c);
+      }
+    }
+    root.innerHTML = "";
+    root.appendChild(svg);
+    if (reduce) {
+      fill.setAttribute("d", "M 2 6 L 98 6");
+      return;
+    }
+    const start = performance.now();
+    function tick(now) {
+      if (!root.isConnected) return;
+      const time = now - start;
+      const loop = (time % CONFIG.durationMs) / CONFIG.durationMs;
+      const scale = detailScale(time);
+      const breath = 2.6 + scale * 1.4;
+      track.setAttribute("stroke-width", breath.toFixed(2));
+      fill.setAttribute("stroke-width", breath.toFixed(2));
+      let ratio = typeof readRatio === "function" ? readRatio() : 0;
+      if (ratio == null || !Number.isFinite(ratio)) {
+        const slide = (Math.sin(loop * Math.PI * 2) + 1) / 2;
+        ratio = 0.18 + slide * 0.22;
+      }
+      ratio = Math.max(0, Math.min(1, ratio));
+      const x = 2 + 96 * ratio;
+      fill.setAttribute("d", "M 2 6 L " + x.toFixed(2) + " 6");
+      dots.forEach(function (node, index) {
+        const tail = index / (count - 1);
+        const along = (((loop - tail * CONFIG.trailSpan) % 1) + 1) % 1;
+        const fade = Math.pow(1 - tail, 0.56);
+        node.setAttribute("cx", (2 + along * 96 * ratio).toFixed(2));
+        node.setAttribute("cy", "6");
+        node.setAttribute("r", (0.55 + fade * 1.55).toFixed(2));
+        node.setAttribute("opacity", (0.04 + fade * 0.96).toFixed(3));
+      });
+      window.requestAnimationFrame(tick);
+    }
+    window.requestAnimationFrame(tick);
+  }
+
+  window.RoseTwo = { mount: mount, mountBar: mountBar };
 
   function boot() {
     mount(document.getElementById("rose-two"));

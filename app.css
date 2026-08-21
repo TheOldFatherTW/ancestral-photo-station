@@ -194,6 +194,42 @@ a.cab {
   background: rgba(255, 255, 255, 0.94);
   color: var(--ink);
 }
+.cab-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 12px 12px;
+  background: linear-gradient(180deg, rgba(250, 250, 250, 0) 0%, rgba(250, 250, 250, 0.92) 38%, rgba(250, 250, 250, 0.96) 100%);
+  color: var(--rose);
+  pointer-events: none;
+}
+.rose-mini {
+  width: 72px;
+  height: 72px;
+  margin: 0;
+}
+.cab-progress-bar {
+  width: 100%;
+  height: 14px;
+}
+.rose-bar-svg {
+  display: block;
+  width: 100%;
+  height: 14px;
+  overflow: visible;
+}
+.cab-progress-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+}
 .cab-sync {
   position: absolute;
   left: 8px;

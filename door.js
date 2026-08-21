@@ -155,13 +155,73 @@
       });
       cover.appendChild(btn);
     } else if (p.sync === "running") {
-      const mark = document.createElement("div");
-      mark.className = "cab-now is-busy";
-      mark.textContent = "備份中";
-      cover.appendChild(mark);
+      attachBusy(cover, p);
     }
     a.appendChild(cover);
     return a;
+  }
+
+  function attachBusy(cover, p) {
+    let wrap = cover.querySelector(".cab-progress");
+    if (!wrap) {
+      wrap = document.createElement("div");
+      wrap.className = "cab-progress";
+      wrap.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+      });
+      const rose = document.createElement("div");
+      rose.className = "rose-two rose-mini";
+      const bar = document.createElement("div");
+      bar.className = "cab-progress-bar";
+      const label = document.createElement("div");
+      label.className = "cab-progress-label";
+      wrap.appendChild(rose);
+      wrap.appendChild(bar);
+      wrap.appendChild(label);
+      cover.appendChild(wrap);
+      if (window.RoseTwo) {
+        window.RoseTwo.mount(rose);
+        window.RoseTwo.mountBar(bar, function () {
+          const n = Number(wrap.dataset.percent);
+          return wrap.dataset.percent === "" || !Number.isFinite(n) ? null : n / 100;
+        });
+      }
+    }
+    wrap.dataset.percent = p.percent == null ? "" : String(p.percent);
+    const label = wrap.querySelector(".cab-progress-label");
+    if (label) {
+      label.textContent =
+        p.percent == null ? "備份中" : "備份中 " + p.percent + "%";
+    }
+  }
+
+  function paintBusy(people) {
+    if (!cabs) return;
+    (people || []).forEach(function (p) {
+      const card = cabs.querySelector('a[href="#' + p.id + '"] .cab-cover');
+      if (!card) return;
+      const wrap = card.querySelector(".cab-progress");
+      if (p.sync === "running") {
+        attachBusy(card, p);
+      } else if (wrap) {
+        wrap.remove();
+      }
+    });
+  }
+
+  function cardStamp(people) {
+    return JSON.stringify(
+      (people || []).map(function (p) {
+        return {
+          id: p.id,
+          sync: p.sync,
+          has_cover: p.has_cover,
+          cover_rev: p.cover_rev,
+          display_name: p.display_name,
+        };
+      })
+    );
   }
 
   async function boot() {
@@ -177,14 +237,19 @@
       (cab.people || []).forEach(function (p) {
         names[p.id] = p.display_name;
       });
-      const stamp = JSON.stringify(cab.people || []);
+      const stamp = cardStamp(cab.people);
       if (cabs && stamp !== lastCab) {
         lastCab = stamp;
         cabs.innerHTML = "";
         (cab.people || []).forEach(function (p) {
           cabs.appendChild(cabCard(p));
         });
+      } else {
+        paintBusy(cab.people);
       }
+      window._familyRunning = (cab.people || []).some(function (p) {
+        return p.sync === "running";
+      });
     } catch (err) {
       fail(DISCONNECTED);
     }
@@ -209,8 +274,11 @@
   }
   window.addEventListener("hashchange", route);
   boot();
-  setInterval(function () {
-    if (!ORIGIN) return;
-    boot();
-  }, 15000);
+  (function poll() {
+    const wait = window._familyRunning ? 4000 : 15000;
+    setTimeout(function () {
+      if (ORIGIN) boot();
+      poll();
+    }, wait);
+  })();
 })();

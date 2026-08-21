@@ -323,6 +323,7 @@ a.cab {
   color: var(--mute);
 }
 .pswp-video {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -331,11 +332,27 @@ a.cab {
 }
 .pswp-video video {
   width: 100%;
-  height: auto;
+  height: 100%;
   max-width: 100%;
-  max-height: 90vh;
+  max-height: 100%;
   object-fit: contain;
   background: #000;
+}
+.vid-wait {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  z-index: 2;
+  white-space: nowrap;
 }
 .cab h2, .box h2 { margin: 0 0 8px; font-size: 22px; font-weight: 600; }
 .meta { color: var(--mute); font-size: 14px; line-height: 1.45; }

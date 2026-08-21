@@ -82,10 +82,10 @@
           tileUrl.replace(/"/g, "") +
           '" src="' +
           src.replace(/"/g, "") +
-          '"></video></div>',
+          '"></video><p class="vid-wait" hidden>影片準備中…</p></div>',
         msrc: tileUrl,
-        width: 1920,
-        height: 1080,
+        width: w,
+        height: h,
         element: tile,
       };
     }
@@ -98,6 +98,43 @@
       element: tile,
       thumbCropped: true,
     };
+  }
+
+  function bufferedPct(video) {
+    const d = video.duration;
+    if (!d || !isFinite(d) || d <= 0) return null;
+    const b = video.buffered;
+    if (!b || !b.length) return 0;
+    const t = video.currentTime || 0;
+    let end = 0;
+    for (let i = 0; i < b.length; i++) {
+      if (b.start(i) <= t + 0.25) end = Math.max(end, b.end(i));
+    }
+    if (!end) end = b.end(b.length - 1);
+    return Math.max(0, Math.min(99, Math.round((end / d) * 100)));
+  }
+
+  function paintWait(video, on) {
+    const hint = video.parentNode && video.parentNode.querySelector(".vid-wait");
+    if (!hint) return;
+    if (!on) {
+      hint.hidden = true;
+      return;
+    }
+    const pct = bufferedPct(video);
+    hint.textContent = pct == null ? "影片準備中…" : "影片準備中 " + pct + "%";
+    hint.hidden = false;
+  }
+
+  function bindVideoWait(video) {
+    if (!video || video.dataset.waitBound) return;
+    video.dataset.waitBound = "1";
+    function refresh() {
+      paintWait(video, !video.paused && (video.readyState < 3 || video.seeking));
+    }
+    ["play", "waiting", "seeking", "seeked", "progress", "canplay", "playing", "pause", "ended", "stalled"].forEach(function (name) {
+      video.addEventListener(name, refresh);
+    });
   }
 
   function ensureLightbox() {
@@ -119,6 +156,20 @@
       const video = el && el.querySelector && el.querySelector("video");
       if (video && !video.getAttribute("src") && video.getAttribute("data-src")) {
         video.src = video.getAttribute("data-src");
+      }
+      if (video) {
+        bindVideoWait(video);
+        const data = evt.content.data;
+        const img = data && data.element && data.element.querySelector("img");
+        const tw = img && img.naturalWidth;
+        const th = img && img.naturalHeight;
+        if (tw && th) {
+          evt.content.width = tw;
+          evt.content.height = th;
+          data.width = tw;
+          data.height = th;
+          if (evt.content.slide) evt.content.slide.updateContentSize(true);
+        }
       }
     });
     lightbox.on("contentDeactivate", function (evt) {
@@ -199,6 +250,13 @@
           if (slide && img.naturalWidth && img.naturalHeight) {
             slide.width = img.naturalWidth;
             slide.height = img.naturalHeight;
+            const pswp = lb && lb.pswp;
+            if (pswp && pswp.currSlide && pswp.currSlide.data === slide) {
+              pswp.currSlide.content.width = img.naturalWidth;
+              pswp.currSlide.content.height = img.naturalHeight;
+              pswp.currSlide.updateContentSize(true);
+              pswp.updateSize(true);
+            }
           }
         });
         a.appendChild(img);

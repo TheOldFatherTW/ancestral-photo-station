@@ -80,7 +80,7 @@
         html:
           '<div class="pswp-video"><video controls playsinline webkit-playsinline preload="none" poster="' +
           tileUrl.replace(/"/g, "") +
-          '" data-src="' +
+          '" src="' +
           src.replace(/"/g, "") +
           '"></video></div>',
         msrc: tileUrl,
@@ -114,6 +114,18 @@
     lightbox.addFilter("itemData", function (itemData, index) {
       return (lightbox._slides && lightbox._slides[index]) || itemData;
     });
+    lightbox.on("contentActivate", function (evt) {
+      const el = evt.content && evt.content.element;
+      const video = el && el.querySelector && el.querySelector("video");
+      if (video && !video.getAttribute("src") && video.getAttribute("data-src")) {
+        video.src = video.getAttribute("data-src");
+      }
+    });
+    lightbox.on("contentDeactivate", function (evt) {
+      const el = evt.content && evt.content.element;
+      const video = el && el.querySelector && el.querySelector("video");
+      if (video) video.pause();
+    });
     lightbox.on("contentLoad", function (evt) {
       const el = evt.content && evt.content.element;
       const video = el && el.querySelector && el.querySelector("video[data-src]");
@@ -126,15 +138,9 @@
     lightbox.on("change", function () {
       if (!lightbox.pswp || !lightbox._slides) return;
       document.querySelectorAll(".pswp-video video").forEach(function (v) {
-        const on = v.closest(".pswp__item") && v.closest(".pswp__item").getAttribute("aria-hidden") !== "true";
-        if (!on) {
-          v.pause();
-          return;
-        }
-        if (!v.getAttribute("src") && v.getAttribute("data-src")) {
-          v.src = v.getAttribute("data-src");
-          v.load();
-        }
+        const item = v.closest(".pswp__item");
+        const on = item && item.getAttribute("aria-hidden") !== "true";
+        if (!on) v.pause();
       });
       if (lightbox.pswp.currIndex >= lightbox._slides.length - 5 && lightbox._nearEnd) {
         lightbox._nearEnd();

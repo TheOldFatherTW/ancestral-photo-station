@@ -4,24 +4,23 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="theme-color" content="#6e1212"/>
-<title>祖傳照片備份站</title>
+<meta name="theme-color" content="#fafafa"/>
+<title>家族照片備份</title>
 <link rel="manifest" href="./manifest.webmanifest"/>
-<link rel="stylesheet" href="./shrine.css"/>
+<link rel="stylesheet" href="./app.css"/>
 <script src="./config.js"></script>
 </head>
 <body>
 <div class="hall">
-  <div class="tablet">
-    <h1>祖傳照片備份站</h1>
-    <p class="since">since 2026</p>
-    <p class="from">from 章晨風</p>
-    <p class="charge">子孫請維護</p>
-    <p class="omen">看一下自己祖先平常都在搞甚麼鬼</p>
-    <div class="chop">不收金紙</div>
+  <div class="profile">
+    <div class="rose-two" id="rose-two"></div>
+    <h1>家族照片備份</h1>
+    <p class="credit">since 2026 from 章晨風</p>
+    <p class="charge">後代請維護</p>
+    <p class="status" id="status">正在問備份硬碟…</p>
   </div>
-  <p class="status" id="status">正在問備份硬碟…</p>
 </div>
+<script src="./rose-two.js"></script>
 <script>
 const STALE_MS = 20 * 60 * 1000;
 const DISCONNECTED = "目前無法連上,請聯絡維護的那個傢伙";

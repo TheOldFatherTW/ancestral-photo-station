@@ -109,7 +109,7 @@ body {
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 20px 16px;
 }
 .feed-month {
   grid-column: 1 / -1;
@@ -123,17 +123,25 @@ body {
 .feed-month:first-child { margin-top: 0; }
 .feed-sentinel {
   width: min(720px, 100%);
-  height: 1px;
+  height: 48px;
   margin: 0 auto;
+}
+.feed-hint {
+  margin: 8px 0 4px;
+  padding: 16px 8px 24px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--mute);
+  letter-spacing: 0.06em;
 }
 a.cab {
   display: block;
   text-decoration: none;
   color: var(--ink);
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  overflow: hidden;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
   padding: 0;
   min-height: 0;
 }
@@ -143,13 +151,33 @@ a.cab {
 .cab-cover {
   position: relative;
   aspect-ratio: 1;
-  background: #efefef;
+  border-radius: 50%;
+  padding: 4px;
+  background: conic-gradient(
+    from 210deg,
+    #feda75 0deg,
+    #fa7e1e 70deg,
+    #d62976 140deg,
+    #962fbf 210deg,
+    #4f5bd5 280deg,
+    #feda75 360deg
+  );
   overflow: hidden;
 }
-.cab-cover img {
+.cab-face {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  padding: 4px;
+  background: var(--bg);
+  overflow: hidden;
+}
+.cab-face img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: 50%;
   display: block;
 }
 .cab-empty-name {
@@ -158,6 +186,8 @@ a.cab {
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 50%;
+  background: #efefef;
   font-size: 22px;
   font-weight: 600;
   color: var(--mute);
@@ -176,18 +206,34 @@ a.cab {
 }
 .cab-pick {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  background: rgba(255, 255, 255, 0.94);
+  top: auto;
+  right: 4%;
+  bottom: 4%;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 0 0 2px var(--bg);
   color: var(--ink);
   z-index: 3;
 }
+.cab-pick svg,
+.cover-change svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
 .cab-now {
   position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: 8px;
-  font-size: 15px;
+  left: 16%;
+  right: 16%;
+  bottom: 14%;
+  font-size: 13px;
+  padding: 8px 6px;
   background: var(--ink);
   color: #fff;
   z-index: 2;
@@ -235,8 +281,8 @@ a.cab {
 }
 .cab-sync {
   position: absolute;
-  left: 8px;
-  bottom: 8px;
+  left: 12%;
+  bottom: 12%;
   z-index: 2;
 }
 .ios-check svg {
@@ -253,9 +299,16 @@ a.cab {
 }
 .album-head h2 { margin: 0; }
 .cover-change {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  flex: 0 0 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   color: var(--mute);
-  padding: 6px 0;
 }
 .pswp-video {
   display: flex;

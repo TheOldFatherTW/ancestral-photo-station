@@ -6,6 +6,7 @@
   let lightbox;
   let thumbActive = 0;
   const thumbWait = [];
+  let paintHint = function () {};
 
   function api(path) {
     return ORIGIN + path;
@@ -18,6 +19,7 @@
       job(function () {
         thumbActive -= 1;
         pumpThumbs();
+        paintHint();
       });
     }
   }
@@ -151,6 +153,7 @@
     start: function (person) {
       const feed = document.getElementById("feed");
       const sentinel = document.getElementById("feed-sentinel");
+      const hint = document.getElementById("feed-hint");
       if (!feed || !person) return;
       const my = ++run;
       let offset = 0;
@@ -160,6 +163,15 @@
       const slides = [];
       feed.innerHTML = "";
       feed.dataset.person = person;
+
+      function showHint() {
+        if (!hint || my !== run) return;
+        const more = loading || (total > 0 && offset < total);
+        const thumbs = thumbActive > 0 || thumbWait.length > 0;
+        hint.hidden = !(more || thumbs);
+        if (!loading && !offset) hint.hidden = true;
+      }
+      paintHint = showHint;
 
       const lb = ensureLightbox();
       if (lb) {
@@ -197,6 +209,7 @@
         if (loading || my !== run) return;
         if (total && offset >= total) return;
         loading = true;
+        showHint();
         try {
           const url =
             api("/api/photos") +
@@ -233,6 +246,7 @@
             '<p class="feed-empty">目前無法連上,請聯絡維護的那個傢伙</p>';
         } finally {
           loading = false;
+          showHint();
         }
       }
 
@@ -243,17 +257,21 @@
           function (entries) {
             if (entries.some(function (e) { return e.isIntersecting; })) loadMore();
           },
-          { rootMargin: "800px 0px" }
+          { rootMargin: "1600px 0px" }
         );
         window.feedObserver.observe(sentinel);
       }
+      showHint();
       loadMore();
     },
     stop: function () {
       run += 1;
+      paintHint = function () {};
       if (window.feedObserver) window.feedObserver.disconnect();
       const sentinel = document.getElementById("feed-sentinel");
+      const hint = document.getElementById("feed-hint");
       if (sentinel) sentinel.hidden = true;
+      if (hint) hint.hidden = true;
     },
   };
 })();

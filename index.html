@@ -8,9 +8,9 @@
 <title>家族照片備份</title>
 <link rel="icon" href="./rose-two.svg" type="image/svg+xml"/>
 <link rel="apple-touch-icon" href="./icons/rose-two-180.png"/>
-<link rel="manifest" href="./manifest.webmanifest?v=11"/>
+<link rel="manifest" href="./manifest.webmanifest?v=13"/>
 <link rel="stylesheet" href="./vendor/photoswipe/photoswipe.css"/>
-<link rel="stylesheet" href="./app.css?v=11"/>
+<link rel="stylesheet" href="./app.css?v=13"/>
 <script src="./config.js"></script>
 </head>
 <body>
@@ -29,17 +29,18 @@
       <a class="back" href="#">← 全部櫃子</a>
       <div class="album-head">
         <h2 id="album-title"></h2>
-        <button type="button" class="cover-change" id="album-cover-btn">更換封面</button>
+        <button type="button" class="cover-change" id="album-cover-btn" aria-label="更換封面" title="更換封面"></button>
       </div>
     </div>
     <div class="feed" id="feed"></div>
+    <p class="feed-hint" id="feed-hint" hidden>讀取照片中…</p>
     <div class="feed-sentinel" id="feed-sentinel" hidden></div>
   </div>
 </div>
 <script src="./vendor/photoswipe/photoswipe.umd.min.js"></script>
 <script src="./vendor/photoswipe/photoswipe-lightbox.umd.min.js"></script>
-<script src="./rose-two.js?v=11"></script>
-<script src="./gallery.js?v=11"></script>
-<script src="./door.js?v=11"></script>
+<script src="./rose-two.js?v=13"></script>
+<script src="./gallery.js?v=13"></script>
+<script src="./door.js?v=13"></script>
 </body>
 </html>

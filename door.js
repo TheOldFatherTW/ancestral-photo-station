@@ -15,6 +15,8 @@
   let lastCab = "";
   let coverInput = null;
   let coverPerson = "";
+  const CAMERA =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="8" width="17" height="11.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 8l1.4-2.4h5.2L16 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="13.6" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>';
 
   function api(path) {
     return ORIGIN + path;
@@ -125,23 +127,26 @@
     a.setAttribute("aria-label", p.display_name);
     const cover = document.createElement("div");
     cover.className = "cab-cover";
+    const face = document.createElement("div");
+    face.className = "cab-face";
     if (p.has_cover) {
       const img = document.createElement("img");
       img.alt = p.display_name;
       img.decoding = "async";
       img.src = api("/cover?person=" + encodeURIComponent(p.id) + "&v=" + (p.cover_rev || 0));
-      cover.appendChild(img);
+      face.appendChild(img);
     } else {
       const empty = document.createElement("div");
       empty.className = "cab-empty-name";
       empty.textContent = p.display_name;
-      cover.appendChild(empty);
+      face.appendChild(empty);
     }
+    cover.appendChild(face);
     if (p.sync === "synced") {
       const mark = document.createElement("div");
       mark.className = "cab-sync";
       mark.innerHTML = CHECK;
-      cover.appendChild(mark);
+      face.appendChild(mark);
     } else if (p.sync === "behind") {
       const btn = document.createElement("button");
       btn.type = "button";
@@ -165,7 +170,7 @@
             fail("現在同步不了，請聯絡維護的那個傢伙");
           });
       });
-      cover.appendChild(btn);
+      face.appendChild(btn);
     } else if (p.sync === "running") {
       attachBusy(cover, p);
     }
@@ -173,7 +178,9 @@
     const pick = document.createElement("button");
     pick.type = "button";
     pick.className = "cab-pick";
-    pick.textContent = p.has_cover ? "換封面" : "選封面";
+    pick.innerHTML = CAMERA;
+    pick.setAttribute("aria-label", p.has_cover ? "換封面" : "選封面");
+    pick.title = p.has_cover ? "換封面" : "選封面";
     pick.addEventListener("click", function (ev) {
       ev.preventDefault();
       ev.stopPropagation();
@@ -202,7 +209,8 @@
       wrap.appendChild(rose);
       wrap.appendChild(bar);
       wrap.appendChild(label);
-      cover.appendChild(wrap);
+      const host = cover.querySelector(".cab-face") || cover;
+      host.appendChild(wrap);
       if (window.RoseTwo) {
         window.RoseTwo.mount(rose);
         window.RoseTwo.mountBar(bar, function () {
@@ -290,6 +298,7 @@
   }
 
   if (albumCoverBtn) {
+    albumCoverBtn.innerHTML = CAMERA;
     albumCoverBtn.addEventListener("click", function () {
       const person = albumCoverBtn.dataset.person || openPerson;
       if (person) pickCover(person);

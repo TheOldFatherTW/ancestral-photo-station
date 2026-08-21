@@ -6,12 +6,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="theme-color" content="#fafafa"/>
 <title>家族照片備份</title>
-<link rel="manifest" href="./manifest.webmanifest?v=2"/>
-<link rel="stylesheet" href="./app.css?v=2"/>
+<link rel="manifest" href="./manifest.webmanifest?v=3"/>
+<link rel="stylesheet" href="./app.css?v=3"/>
 <script src="./config.js"></script>
 </head>
 <body>
-<div class="hall">
+<div class="hall with-feed" style="padding:32px 16px 8px">
   <div class="profile">
     <div class="rose-two" id="rose-two"></div>
     <h1>家族照片備份</h1>
@@ -19,50 +19,23 @@
     <p class="charge">後代請維護</p>
     <p class="status" id="status">正在問備份硬碟…</p>
   </div>
+  <div class="local-cabs">
+    <div class="grid" id="cabinets"></div>
+  </div>
+  <div id="album" hidden>
+    <div class="wrap" style="padding-top:8px">
+      <a class="back" href="#">← 全部櫃子</a>
+      <h2 id="album-title"></h2>
+    </div>
+    <div class="feed" id="feed"></div>
+  </div>
 </div>
-<script src="./rose-two.js?v=2"></script>
-<script>
-const STALE_MS = 20 * 60 * 1000;
-const DISCONNECTED = "目前無法連上,請聯絡維護的那個傢伙";
-
-function lineFrom(data) {
-  if (!data || !data.updated_at) return DISCONNECTED;
-  const t = Date.parse(data.updated_at);
-  if (!Number.isFinite(t) || (Date.now() - t) > STALE_MS) return DISCONNECTED;
-  if (data.rescuing) {
-    if (data.percent == null) return "正在救援中,目前進度？%";
-    return "正在救援中,目前進度" + data.percent + "%";
-  }
-  return "";
-}
-
-async function readJson(url) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 4000);
-  try {
-    const res = await fetch(url, { cache: "no-store", signal: ctrl.signal });
-    if (!res.ok) throw new Error("bad status");
-    return await res.json();
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-async function refresh() {
-  const el = document.getElementById("status");
-  const live = window.VAULT_STATUS_URL;
-  try {
-    const data = live
-      ? await readJson(live)
-      : await readJson("./status.json");
-    el.textContent = lineFrom(data);
-  } catch (err) {
-    el.textContent = DISCONNECTED;
-  }
-}
-
-refresh();
-setInterval(refresh, 30000);
-</script>
+<div class="lightbox" id="lightbox">
+  <img id="lightbox-img" alt=""/>
+  <video id="lightbox-vid" controls hidden></video>
+</div>
+<script src="./rose-two.js?v=3"></script>
+<script src="./gallery.js?v=3"></script>
+<script src="./door.js?v=3"></script>
 </body>
 </html>

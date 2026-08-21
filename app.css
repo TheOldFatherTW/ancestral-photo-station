@@ -138,6 +138,7 @@ a.cab {
   min-height: 0;
 }
 .cab-cover {
+  position: relative;
   aspect-ratio: 1;
   background: #efefef;
   overflow: hidden;
@@ -148,10 +149,74 @@ a.cab {
   object-fit: cover;
   display: block;
 }
-.cab-name {
-  padding: 10px 12px 12px;
-  font-size: 17px;
+.cab-empty-name {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
   font-weight: 600;
+  color: var(--mute);
+}
+.cab-pick,
+.cab-now,
+.cover-change {
+  margin: 0;
+  width: auto;
+  display: block;
+  font-size: 13px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.cab-pick {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--ink);
+  z-index: 2;
+}
+.cab-now {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  font-size: 15px;
+  background: var(--ink);
+  color: #fff;
+  z-index: 2;
+  text-align: center;
+}
+.cab-now.is-busy {
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--ink);
+}
+.cab-sync {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 2;
+}
+.ios-check svg {
+  width: 28px;
+  height: 28px;
+  display: block;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.28));
+}
+.album-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.album-head h2 { margin: 0; }
+.cover-change {
+  background: transparent;
+  color: var(--mute);
+  padding: 6px 0;
 }
 .pswp-video {
   display: flex;

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="theme-color" content="#6e1212"/>
+<title>祖傳照片備份站</title>
+<link rel="manifest" href="./manifest.webmanifest"/>
+<link rel="stylesheet" href="./shrine.css"/>
+<script src="./config.js"></script>
+</head>
+<body>
+<div class="hall">
+  <div class="tablet">
+    <h1>祖傳照片備份站</h1>
+    <p class="since">since 2026</p>
+    <p class="from">from 章晨風</p>
+    <p class="charge">子孫請維護</p>
+    <p class="omen">看一下自己祖先平常都在搞甚麼鬼</p>
+    <div class="chop">不收金紙</div>
+  </div>
+  <p class="status" id="status">正在問備份硬碟…</p>
+</div>
+<script>
+const STALE_MS = 20 * 60 * 1000;
+const DISCONNECTED = "目前無法連上,請聯絡維護的那個傢伙";
+
+function lineFrom(data) {
+  if (!data || !data.updated_at) return DISCONNECTED;
+  const t = Date.parse(data.updated_at);
+  if (!Number.isFinite(t) || (Date.now() - t) > STALE_MS) return DISCONNECTED;
+  if (data.rescuing) {
+    if (data.percent == null) return "正在救援中,目前進度？%";
+    return "正在救援中,目前進度" + data.percent + "%";
+  }
+  return "";
+}
+
+async function readJson(url) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 4000);
+  try {
+    const res = await fetch(url, { cache: "no-store", signal: ctrl.signal });
+    if (!res.ok) throw new Error("bad status");
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function refresh() {
+  const el = document.getElementById("status");
+  const live = window.VAULT_STATUS_URL;
+  try {
+    const data = live
+      ? await readJson(live)
+      : await readJson("./status.json");
+    el.textContent = lineFrom(data);
+  } catch (err) {
+    el.textContent = DISCONNECTED;
+  }
+}
+
+refresh();
+setInterval(refresh, 30000);
+</script>
+</body>
+</html>

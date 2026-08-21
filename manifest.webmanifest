@@ -1,0 +1,9 @@
+{
+  "name": "祖傳照片備份站",
+  "short_name": "祖傳備份",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#140c08",
+  "theme_color": "#6e1212",
+  "lang": "zh-Hant"
+}

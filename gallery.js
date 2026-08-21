@@ -1,11 +1,53 @@
 (function () {
   const ORIGIN = (window.VAULT_ORIGIN || "").replace(/\/$/, "");
   const LIMIT = 24;
+  const THUMB_SLOTS = 4;
   let run = 0;
   let lightbox;
+  let thumbActive = 0;
+  const thumbWait = [];
 
   function api(path) {
     return ORIGIN + path;
+  }
+
+  function pumpThumbs() {
+    while (thumbActive < THUMB_SLOTS && thumbWait.length) {
+      const job = thumbWait.shift();
+      thumbActive += 1;
+      job(function () {
+        thumbActive -= 1;
+        pumpThumbs();
+      });
+    }
+  }
+
+  function bindThumb(img, url) {
+    let tries = 0;
+    function start(done) {
+      function settle() {
+        img.removeEventListener("load", onLoad);
+        img.removeEventListener("error", onErr);
+        if (done) done();
+      }
+      function onLoad() {
+        settle();
+      }
+      function onErr() {
+        settle();
+        if (tries >= 3) return;
+        tries += 1;
+        window.setTimeout(function () {
+          thumbWait.push(start);
+          pumpThumbs();
+        }, 450 * tries);
+      }
+      img.addEventListener("load", onLoad);
+      img.addEventListener("error", onErr);
+      img.src = tries ? url + "&retry=" + tries : url;
+    }
+    thumbWait.push(start);
+    pumpThumbs();
   }
 
   function qs(item, kind, size) {
@@ -108,7 +150,7 @@
         const img = document.createElement("img");
         img.decoding = "async";
         img.alt = item.who;
-        img.src = qs(item, "thumb");
+        bindThumb(img, qs(item, "thumb"));
         a.appendChild(img);
         a.addEventListener("click", function (ev) {
           ev.preventDefault();

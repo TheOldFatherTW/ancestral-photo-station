@@ -275,10 +275,24 @@
   window.addEventListener("hashchange", route);
   boot();
   (function poll() {
-    const wait = window._familyRunning ? 4000 : 15000;
+    const wait = !openPerson && window._familyRunning ? 4000 : 15000;
     setTimeout(function () {
-      if (ORIGIN) boot();
-      poll();
+      if (!ORIGIN) {
+        poll();
+        return;
+      }
+      if (openPerson) {
+        readJson("/api/public")
+          .then(function (pub) {
+            if (statusEl) statusEl.textContent = lineFrom(pub);
+          })
+          .catch(function () {
+            fail(DISCONNECTED);
+          })
+          .then(poll);
+      } else {
+        Promise.resolve(boot()).then(poll);
+      }
     }, wait);
   })();
 })();

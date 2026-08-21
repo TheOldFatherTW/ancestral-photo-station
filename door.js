@@ -7,6 +7,7 @@
   const album = document.getElementById("album");
   const albumTitle = document.getElementById("album-title");
   const feed = document.getElementById("feed");
+  let openPerson = "";
 
   function lineFrom(data) {
     if (!data || !data.updated_at) return DISCONNECTED;
@@ -39,6 +40,8 @@
   }
 
   function showHome() {
+    openPerson = "";
+    if (window.FamilyFeed) window.FamilyFeed.stop();
     if (cabs) cabs.hidden = false;
     if (album) album.hidden = true;
     if (feed) feed.innerHTML = "";
@@ -48,7 +51,40 @@
     if (cabs) cabs.hidden = true;
     if (album) album.hidden = false;
     if (albumTitle) albumTitle.textContent = name || person;
+    if (openPerson === person) return;
+    openPerson = person;
     if (window.FamilyFeed) window.FamilyFeed.start(person);
+  }
+
+  function coverUrl(cover) {
+    const p = new URLSearchParams({
+      person: cover.person,
+      bucket: cover.bucket,
+      rel: cover.rel,
+      size: "tile",
+    });
+    return ORIGIN + "/thumb?" + p.toString();
+  }
+
+  function cabCard(p) {
+    const a = document.createElement("a");
+    a.className = "cab";
+    a.href = "#" + p.id;
+    const cover = document.createElement("div");
+    cover.className = "cab-cover";
+    if (p.cover) {
+      const img = document.createElement("img");
+      img.alt = "";
+      img.decoding = "async";
+      img.src = coverUrl(p.cover);
+      cover.appendChild(img);
+    }
+    const name = document.createElement("div");
+    name.className = "cab-name";
+    name.textContent = p.display_name;
+    a.appendChild(cover);
+    a.appendChild(name);
+    return a;
   }
 
   async function boot() {
@@ -63,16 +99,7 @@
       if (cabs) {
         cabs.innerHTML = "";
         (cab.people || []).forEach(function (p) {
-          const a = document.createElement("a");
-          a.className = "cab";
-          a.href = "#" + p.id;
-          a.innerHTML =
-            "<h2>" +
-            p.display_name +
-            "</h2><div class='meta'>已救 " +
-            (p.icloud_files + p.usb_files) +
-            " 個檔</div>";
-          cabs.appendChild(a);
+          cabs.appendChild(cabCard(p));
         });
       }
     } catch (err) {
@@ -87,7 +114,7 @@
       showHome();
       return;
     }
-    const link = cabs ? cabs.querySelector('a[href="#' + id + '"] h2') : null;
+    const link = cabs ? cabs.querySelector('a[href="#' + id + '"] .cab-name') : null;
     showAlbum(id, link ? link.textContent : id);
   }
 

@@ -6,8 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="theme-color" content="#fafafa"/>
 <title>家族照片備份</title>
-<link rel="manifest" href="./manifest.webmanifest?v=3"/>
-<link rel="stylesheet" href="./app.css?v=3"/>
+<link rel="manifest" href="./manifest.webmanifest?v=5"/>
+<link rel="stylesheet" href="./vendor/photoswipe/photoswipe.css"/>
+<link rel="stylesheet" href="./app.css?v=5"/>
 <script src="./config.js"></script>
 </head>
 <body>
@@ -28,14 +29,13 @@
       <h2 id="album-title"></h2>
     </div>
     <div class="feed" id="feed"></div>
+    <div class="feed-sentinel" id="feed-sentinel" hidden></div>
   </div>
 </div>
-<div class="lightbox" id="lightbox">
-  <img id="lightbox-img" alt=""/>
-  <video id="lightbox-vid" controls hidden></video>
-</div>
-<script src="./rose-two.js?v=3"></script>
-<script src="./gallery.js?v=3"></script>
-<script src="./door.js?v=3"></script>
+<script src="./vendor/photoswipe/photoswipe.umd.min.js"></script>
+<script src="./vendor/photoswipe/photoswipe-lightbox.umd.min.js"></script>
+<script src="./rose-two.js?v=5"></script>
+<script src="./gallery.js?v=5"></script>
+<script src="./door.js?v=5"></script>
 </body>
 </html>

@@ -16,11 +16,18 @@
   let lastCab = "";
   let coverInput = null;
   let coverPerson = "";
+  let uploadInput = null;
+  let uploadPerson = "";
+  let uploadBusy = false;
+  const UPLOAD_CAP = 480 * 1024 * 1024;
+  const BATCH_CAP = 40 * 1024 * 1024;
   let backupAsk = {};
   const CAMERA =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="8" width="17" height="11.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 8l1.4-2.4h5.2L16 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="13.6" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>';
   const REFRESH =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M20 4.5V9h-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const UPLOAD =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16.5V4.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M7.4 9.4L12 4.8l4.6 4.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.6 15.4v2.6a2 2 0 0 0 2 2h10.8a2 2 0 0 0 2-2v-2.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
   const TRASH =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8V6.8A1.8 1.8 0 0 1 9.8 5h4.4A1.8 1.8 0 0 1 16 6.8V8M5 8h14M9 11v7M12 11v7M15 11v7M7 8l.8 12.2A1.6 1.6 0 0 0 9.4 22h5.2a1.6 1.6 0 0 0 1.6-1.8L17 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const HASH =
@@ -169,6 +176,99 @@
     }
   }
 
+  // A phone that will not sync to iCloud and will not talk to Windows over the cable can
+  // still open this page, so hand-picking the stranded pictures is the last way in.
+  function pickUpload(person) {
+    uploadPerson = person;
+    if (!uploadInput) {
+      uploadInput = document.createElement("input");
+      uploadInput.type = "file";
+      uploadInput.accept = "image/*,video/*";
+      uploadInput.multiple = true;
+      uploadInput.setAttribute("aria-hidden", "true");
+      uploadInput.style.cssText =
+        "position:fixed;left:0;top:0;width:1px;height:1px;opacity:0.01;pointer-events:none;";
+      document.body.appendChild(uploadInput);
+      uploadInput.addEventListener("change", function () {
+        const picked = Array.prototype.slice.call(uploadInput.files || []);
+        const who = uploadPerson;
+        uploadInput.value = "";
+        if (picked.length && who) sendUploads(who, picked);
+      });
+    }
+    uploadInput.value = "";
+    uploadInput.click();
+  }
+
+  async function sendUploads(person, files) {
+    if (uploadBusy) {
+      fail("上一批還在傳，傳完再選下一批");
+      return;
+    }
+    uploadBusy = true;
+    const url = api("/api/upload?person=" + encodeURIComponent(person));
+    let sent = 0;
+    let saved = 0;
+    let already = 0;
+    let failed = 0;
+    // Batched by weight rather than count: one pass of holiday videos and one pass of
+    // screenshots are wildly different sizes, and a whole pick in one POST would be refused.
+    let batch = [];
+    let bytes = 0;
+    async function flush() {
+      if (!batch.length) return;
+      const body = new FormData();
+      batch.forEach(function (f) {
+        body.append("photo", f, f.name || "photo.jpg");
+      });
+      const n = batch.length;
+      batch = [];
+      bytes = 0;
+      try {
+        const res = await fetch(url, { method: "POST", body: body });
+        const data = await res.json().catch(function () {
+          return {};
+        });
+        if (!res.ok) throw new Error(data.error || "fail");
+        saved += (data.saved || []).length;
+        already += (data.already || []).length;
+        failed += (data.rejected || []).length;
+      } catch (err) {
+        failed += n;
+      }
+      sent += n;
+      fail("上傳中 " + sent + "/" + files.length + "…");
+    }
+    fail("上傳中 0/" + files.length + "…");
+    try {
+      for (const f of files) {
+        if (f.size > UPLOAD_CAP) {
+          failed += 1;
+          sent += 1;
+          continue;
+        }
+        if (bytes + f.size > BATCH_CAP && batch.length) await flush();
+        batch.push(f);
+        bytes += f.size;
+      }
+      await flush();
+      const bits = [];
+      if (saved) bits.push("收進來 " + saved + " 張");
+      if (already) bits.push(already + " 張本來就有");
+      if (failed) bits.push(failed + " 張傳不上來");
+      fail(bits.length ? bits.join("，") : "沒有新的照片");
+      if (saved) {
+        lastCab = "";
+        await boot();
+        if (openPerson === person && window.FamilyFeed && window.FamilyFeed.refresh) {
+          window.FamilyFeed.refresh();
+        }
+      }
+    } finally {
+      uploadBusy = false;
+    }
+  }
+
   function insButton(className, svg, label) {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -284,6 +384,12 @@
       ev.stopPropagation();
       startBackup(p.id, refresh);
     });
+    const send = insButton("cab-send", UPLOAD, "手動上傳照片");
+    send.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      pickUpload(p.id);
+    });
     const bars = document.createElement("div");
     bars.className = "cab-bars";
     bars.appendChild(hpRow("backup"));
@@ -291,6 +397,7 @@
     const actions = document.createElement("div");
     actions.className = "cab-actions";
     actions.appendChild(refresh);
+    actions.appendChild(send);
     actions.appendChild(pick);
     const side = document.createElement("div");
     side.className = "cab-side";

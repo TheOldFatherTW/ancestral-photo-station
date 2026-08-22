@@ -66,6 +66,20 @@
     return ids.length === 1 ? ids[0] : "";
   }
 
+  function paintSoloChrome() {
+    const solo = !!onlyPerson();
+    const homeWrap = document.querySelector(".local-cabs");
+    const bar = document.querySelector(".album-bar");
+    const back = document.querySelector("#album .back");
+    if (homeWrap) {
+      homeWrap.hidden = false;
+      homeWrap.classList.toggle("solo", solo);
+    }
+    if (cabs) cabs.hidden = false;
+    if (bar) bar.hidden = solo;
+    if (back) back.hidden = solo;
+  }
+
   function showHome() {
     const only = onlyPerson();
     if (only) {
@@ -74,16 +88,28 @@
     }
     openPerson = "";
     if (window.FamilyFeed) window.FamilyFeed.stop();
+    paintSoloChrome();
+    const homeWrap = document.querySelector(".local-cabs");
+    if (homeWrap) homeWrap.hidden = false;
     if (cabs) cabs.hidden = false;
     if (album) album.hidden = true;
     if (feed) feed.innerHTML = "";
+    const board = document.getElementById("tag-board");
+    if (board) board.hidden = true;
   }
 
   function showAlbum(person, name) {
-    if (cabs) cabs.hidden = true;
+    const solo = !!onlyPerson();
+    paintSoloChrome();
+    if (!solo) {
+      const homeWrap = document.querySelector(".local-cabs");
+      if (homeWrap) homeWrap.hidden = true;
+      if (cabs) cabs.hidden = true;
+    }
     if (album) album.hidden = false;
-    if (albumTitle) albumTitle.textContent = name || names[person] || person;
+    if (!solo && albumTitle) albumTitle.textContent = name || names[person] || person;
     if (albumCoverBtn) albumCoverBtn.dataset.person = person;
+    if (window.FamilyTags) window.FamilyTags.show(person);
     if (openPerson === person) return;
     openPerson = person;
     if (window.FamilyFeed) window.FamilyFeed.start(person);
@@ -303,12 +329,6 @@
       } else {
         paintBusy(cab.people);
       }
-      const people = cab.people || [];
-      const back = document.querySelector("#album .back");
-      if (back) back.hidden = people.length < 2;
-      const homeWrap = document.querySelector(".local-cabs");
-      if (homeWrap) homeWrap.hidden = people.length < 2;
-      if (cabs) cabs.hidden = people.length < 2;
       window._familyRunning = (cab.people || []).some(function (p) {
         return p.sync === "running";
       });

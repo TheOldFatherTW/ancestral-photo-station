@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "家族照片備份",
-  "short_name": "家族備份",
+  "name": "Famiphoto",
+  "short_name": "Famiphoto",
   "scope": "./",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],

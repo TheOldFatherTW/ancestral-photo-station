@@ -95,13 +95,23 @@ body {
   height: 100%;
   overflow: visible;
 }
-.profile h1 {
+.profile h1,
+.profile h1.brand {
   margin: 0;
-  font-size: clamp(26px, 7vw, 34px);
+  font-family: Unbounded, "Segoe UI", sans-serif;
+  font-size: clamp(28px, 8vw, 38px);
   font-weight: 600;
-  line-height: 1.25;
-  letter-spacing: 0.08em;
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+  color: var(--rose);
   white-space: nowrap;
+}
+.local-cabs.solo .grid {
+  grid-template-columns: 1fr;
+  justify-items: center;
+}
+.local-cabs.solo .cab-wrap {
+  width: min(176px, 46vw);
 }
 .credit {
   margin: 10px 0 0;
@@ -393,6 +403,65 @@ button, .btn {
   border-radius: 10px;
 }
 .wrap { max-width: 720px; margin: 0 auto; padding: 20px 16px 48px; }
+.album-bar[hidden],
+.back[hidden],
+.local-cabs[hidden],
+.tag-board[hidden] {
+  display: none !important;
+}
+.tag-board {
+  width: min(720px, 94vw);
+  margin: 18px auto 0;
+  text-align: left;
+}
+.tag-job,
+.tag-tools {
+  margin: 0 0 10px;
+  color: var(--mute);
+  font-size: 13px;
+}
+.tag-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tag-group { margin: 0 0 12px; }
+.tag-board button.tag-head,
+.tag-board button.tag-edit,
+.tag-board button.tag-chip {
+  margin: 0;
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  letter-spacing: 0.02em;
+}
+.tag-board button.tag-head {
+  padding: 4px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--mute);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+.tag-board button.tag-edit.is-on,
+.tag-board button.tag-chip.is-on {
+  background: var(--rose);
+  border-color: var(--rose);
+  color: #fff;
+}
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 @media (max-width: 560px) {
   .credit { white-space: normal; }
 }

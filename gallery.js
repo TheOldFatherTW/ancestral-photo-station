@@ -210,7 +210,7 @@
   }
 
   window.FamilyFeed = {
-    start: function (person) {
+    start: function (person, tagIds) {
       const feed = document.getElementById("feed");
       const sentinel = document.getElementById("feed-sentinel");
       const hint = document.getElementById("feed-hint");
@@ -223,6 +223,7 @@
       const slides = [];
       feed.innerHTML = "";
       feed.dataset.person = person;
+      feed.dataset.tags = (tagIds || []).join(",");
 
       function showHint() {
         if (!hint || my !== run) return;
@@ -286,14 +287,18 @@
         showHint();
         let got = 0;
         try {
-          const url = api(
+          const tags = (feed.dataset.tags || "")
+            .split(",")
+            .filter(Boolean);
+          let path =
             "/api/photos?person=" +
-              encodeURIComponent(person) +
-              "&offset=" +
-              offset +
-              "&limit=" +
-              LIMIT
-          );
+            encodeURIComponent(person) +
+            "&offset=" +
+            offset +
+            "&limit=" +
+            LIMIT;
+          if (tags.length) path += "&tags=" + tags.map(encodeURIComponent).join(",");
+          const url = api(path);
           const res = await fetch(url);
           const data = await res.json();
           if (my !== run) return;
@@ -344,6 +349,10 @@
       }
       showHint();
       loadMore();
+    },
+    filter: function (tagIds) {
+      const person = (document.getElementById("feed") || {}).dataset.person;
+      if (person) window.FamilyFeed.start(person, tagIds || []);
     },
     stop: function () {
       run += 1;

@@ -18,6 +18,8 @@
   let coverPerson = "";
   const CAMERA =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="8" width="17" height="11.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 8l1.4-2.4h5.2L16 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="13.6" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>';
+  const REFRESH =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M20 4.5V9h-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
   function api(path) {
     const url = ORIGIN + path;
@@ -30,10 +32,6 @@
     if (!data || !data.updated_at) return DISCONNECTED;
     const t = Date.parse(data.updated_at);
     if (!Number.isFinite(t) || Date.now() - t > STALE_MS) return DISCONNECTED;
-    if (data.rescuing) {
-      if (data.percent == null) return "正在救援中,目前進度？%";
-      return "正在救援中,目前進度" + data.percent + "%";
-    }
     return "";
   }
 
@@ -163,6 +161,9 @@
   }
 
   function cabCard(p) {
+    const hud = document.createElement("div");
+    hud.className = "cab-hud";
+    hud.dataset.person = p.id;
     const wrap = document.createElement("div");
     wrap.className = "cab-wrap";
     const a = document.createElement("a");
@@ -187,38 +188,6 @@
       face.appendChild(empty);
     }
     cover.appendChild(face);
-    if (p.sync === "synced") {
-      const mark = document.createElement("div");
-      mark.className = "cab-sync";
-      mark.innerHTML = CHECK;
-      face.appendChild(mark);
-    } else if (p.sync === "behind") {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "cab-now";
-      btn.textContent = "立即同步";
-      btn.addEventListener("click", function (ev) {
-        ev.preventDefault();
-        ev.stopPropagation();
-        fetch(api("/api/sync?person=" + encodeURIComponent(p.id)), { method: "POST" })
-          .then(function (res) {
-            return res.json().then(function (j) {
-              return { res: res, j: j };
-            });
-          })
-          .then(function (x) {
-            if (!x.res.ok) throw new Error(x.j.error || "fail");
-            lastCab = "";
-            boot();
-          })
-          .catch(function () {
-            fail("現在同步不了，請聯絡維護的那個傢伙");
-          });
-      });
-      face.appendChild(btn);
-    } else if (p.sync === "running") {
-      attachBusy(cover, p);
-    }
     a.appendChild(cover);
     const pick = document.createElement("button");
     pick.type = "button";
@@ -231,59 +200,139 @@
       ev.stopPropagation();
       pickCover(p.id);
     });
+    const refresh = document.createElement("button");
+    refresh.type = "button";
+    refresh.className = "cab-refresh";
+    refresh.innerHTML = REFRESH;
+    refresh.setAttribute("aria-label", "檢查並備份");
+    refresh.title = "檢查並備份";
+    refresh.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      startBackup(p.id, refresh);
+    });
     wrap.appendChild(a);
+    wrap.appendChild(refresh);
     wrap.appendChild(pick);
-    return wrap;
+    const bars = document.createElement("div");
+    bars.className = "cab-bars";
+    bars.appendChild(hpRow("backup"));
+    bars.appendChild(hpRow("tag"));
+    hud.appendChild(wrap);
+    hud.appendChild(bars);
+    fillHud(hud, p);
+    return hud;
   }
 
-  function attachBusy(cover, p) {
-    let wrap = cover.querySelector(".cab-progress");
-    if (!wrap) {
-      wrap = document.createElement("div");
-      wrap.className = "cab-progress";
-      wrap.addEventListener("click", function (ev) {
-        ev.preventDefault();
-        ev.stopPropagation();
-      });
-      const rose = document.createElement("div");
-      rose.className = "rose-two rose-mini";
-      const bar = document.createElement("div");
-      bar.className = "cab-progress-bar";
-      const label = document.createElement("div");
-      label.className = "cab-progress-label";
-      wrap.appendChild(rose);
-      wrap.appendChild(bar);
-      wrap.appendChild(label);
-      const host = cover.querySelector(".cab-face") || cover;
-      host.appendChild(wrap);
-      if (window.RoseTwo) {
-        window.RoseTwo.mount(rose);
-        window.RoseTwo.mountBar(bar, function () {
-          const n = Number(wrap.dataset.percent);
-          return wrap.dataset.percent === "" || !Number.isFinite(n) ? null : n / 100;
-        });
-      }
-    }
-    wrap.dataset.percent = p.percent == null ? "" : String(p.percent);
-    const label = wrap.querySelector(".cab-progress-label");
-    if (label) {
-      label.textContent =
-        p.percent == null ? "備份中" : "備份中 " + p.percent + "%";
-    }
+  function hpRow(kind) {
+    const row = document.createElement("div");
+    row.className = "hp";
+    row.dataset.kind = kind;
+    const label = document.createElement("div");
+    label.className = "hp-label";
+    const text = document.createElement("span");
+    text.className = "hp-text";
+    const mark = document.createElement("span");
+    mark.className = "hp-check";
+    mark.hidden = true;
+    mark.innerHTML = CHECK;
+    label.appendChild(text);
+    label.appendChild(mark);
+    const meter = document.createElement("div");
+    meter.className = "hp-meter";
+    const track = document.createElement("div");
+    track.className = "hp-track";
+    const fill = document.createElement("div");
+    fill.className = "hp-fill";
+    track.appendChild(fill);
+    const num = document.createElement("span");
+    num.className = "hp-num";
+    meter.appendChild(track);
+    meter.appendChild(num);
+    row.appendChild(label);
+    row.appendChild(meter);
+    return row;
   }
 
-  function paintBusy(people) {
+  function fillHud(hud, p) {
+    const backupRun = p.sync === "running";
+    const backupDone = p.sync === "synced";
+    paintHp(hud.querySelector('.hp[data-kind="backup"]'), {
+      running: backupRun,
+      done: backupDone,
+      percent: p.percent,
+      busyText: "自動備份中…",
+      doneText: "備份完成",
+      waitText: "尚未同步",
+    });
+    const job = p.tag || {};
+    const tagRun = job.state === "running";
+    const tagDone = !tagRun && job.percent === 100;
+    paintHp(hud.querySelector('.hp[data-kind="tag"]'), {
+      running: tagRun,
+      done: tagDone,
+      percent: job.percent,
+      busyText: "自動標記中…",
+      doneText: "標記完成",
+      waitText: "自動標記中…",
+    });
+    const refresh = hud.querySelector(".cab-refresh");
+    if (refresh) refresh.classList.toggle("is-run", backupRun);
+  }
+
+  function paintHp(row, view) {
+    if (!row) return;
+    const text = row.querySelector(".hp-text");
+    const mark = row.querySelector(".hp-check");
+    const fill = row.querySelector(".hp-fill");
+    const num = row.querySelector(".hp-num");
+    const pct = view.percent == null ? null : Number(view.percent);
+    const shown = Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : null;
+    if (text) {
+      text.textContent = view.running
+        ? view.busyText
+        : view.done
+          ? view.doneText
+          : view.waitText;
+    }
+    if (mark) mark.hidden = !view.done;
+    if (fill) fill.style.width = (view.done ? 100 : shown == null ? 0 : shown) + "%";
+    if (num) {
+      if (view.done) num.textContent = "";
+      else if (shown == null) num.textContent = view.running ? "…" : "";
+      else num.textContent = shown + "%";
+    }
+    row.classList.toggle("is-run", !!view.running);
+    row.classList.toggle("is-done", !!view.done);
+  }
+
+  function paintHud(people) {
     if (!cabs) return;
     (people || []).forEach(function (p) {
-      const card = cabs.querySelector('a[href="#' + p.id + '"] .cab-cover');
-      if (!card) return;
-      const wrap = card.querySelector(".cab-progress");
-      if (p.sync === "running") {
-        attachBusy(card, p);
-      } else if (wrap) {
-        wrap.remove();
-      }
+      const hud = cabs.querySelector('.cab-hud[data-person="' + p.id + '"]');
+      if (hud) fillHud(hud, p);
     });
+  }
+
+  function startBackup(person, btn) {
+    if (btn) btn.classList.add("is-run");
+    fetch(api("/api/sync?person=" + encodeURIComponent(person)), { method: "POST" })
+      .then(function (res) {
+        return res.json().then(function (j) {
+          return { res: res, j: j };
+        });
+      })
+      .then(function (x) {
+        if (!x.res.ok && x.j && x.j.sync !== "running") {
+          throw new Error(x.j.error || "fail");
+        }
+        lastCab = "";
+        boot();
+      })
+      .catch(function () {
+        fail("現在同步不了，請聯絡維護的那個傢伙");
+        if (btn) btn.classList.remove("is-run");
+      });
   }
 
   function cardStamp(people) {
@@ -327,10 +376,13 @@
           cabs.appendChild(cabCard(p));
         });
       } else {
-        paintBusy(cab.people);
+        paintHud(cab.people);
       }
       window._familyRunning = (cab.people || []).some(function (p) {
         return p.sync === "running";
+      });
+      window._familyTagging = (cab.people || []).some(function (p) {
+        return p.tag && p.tag.state === "running";
       });
     } catch (err) {
       fail(err && err.code === "need_key" ? NEED_LINK : DISCONNECTED);
@@ -363,24 +415,13 @@
   window.addEventListener("hashchange", route);
   boot();
   (function poll() {
-    const wait = !openPerson && window._familyRunning ? 4000 : 15000;
+    const wait = window._familyRunning || window._familyTagging ? 3000 : 12000;
     setTimeout(function () {
       if (!ORIGIN) {
         poll();
         return;
       }
-      if (openPerson) {
-        readJson("/api/public")
-          .then(function (pub) {
-            if (statusEl) statusEl.textContent = lineFrom(pub);
-          })
-          .catch(function () {
-            fail(DISCONNECTED);
-          })
-          .then(poll);
-      } else {
-        Promise.resolve(boot()).then(poll);
-      }
+      Promise.resolve(boot()).then(poll);
     }, wait);
   })();
 })();

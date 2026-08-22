@@ -90,6 +90,7 @@
         width: w,
         height: h,
         element: tile,
+        familyItem: item,
       };
     }
     return {
@@ -100,6 +101,7 @@
       alt: item.who,
       element: tile,
       thumbCropped: true,
+      familyItem: item,
     };
   }
 
@@ -147,6 +149,9 @@
       loop: false,
       bgOpacity: 0.92,
       errorMsg: "目前無法載入",
+      clickToCloseNonZoomable: false,
+      imageClickAction: false,
+      tapAction: false,
     });
     lightbox.addFilter("numItems", function () {
       return lightbox._slides ? lightbox._slides.length : 0;
@@ -189,6 +194,12 @@
         video.load();
       }
     });
+    lightbox.on("close", function () {
+      document.querySelectorAll(".pswp-video video").forEach(function (v) {
+        v.pause();
+      });
+      if (window.FamilyTags) window.FamilyTags.closePhoto();
+    });
     lightbox.on("change", function () {
       if (!lightbox.pswp || !lightbox._slides) return;
       document.querySelectorAll(".pswp-video video").forEach(function (v) {
@@ -199,11 +210,34 @@
       if (lightbox.pswp.currIndex >= lightbox._slides.length - 5 && lightbox._nearEnd) {
         lightbox._nearEnd();
       }
+      const slide = lightbox._slides[lightbox.pswp.currIndex];
+      if (window.FamilyTags && slide && slide.familyItem) {
+        window.FamilyTags.showPhoto(slide.familyItem);
+      }
     });
-    lightbox.on("close", function () {
-      document.querySelectorAll(".pswp-video video").forEach(function (v) {
-        v.pause();
-      });
+    lightbox.on("imageClickAction", function (evt) {
+      evt.preventDefault();
+      const slide =
+        lightbox._slides &&
+        lightbox.pswp &&
+        lightbox._slides[lightbox.pswp.currIndex];
+      if (window.FamilyTags && slide && slide.familyItem) {
+        window.FamilyTags.togglePhoto(slide.familyItem);
+      }
+    });
+    lightbox.on("tapAction", function (evt) {
+      const orig = evt.originalEvent;
+      const target = orig && orig.target;
+      if (target && target.closest && target.closest("video, .pswp__button, .pswp-tag-sheet")) {
+        return;
+      }
+      const slide =
+        lightbox._slides &&
+        lightbox.pswp &&
+        lightbox._slides[lightbox.pswp.currIndex];
+      if (!slide || !slide.familyItem || slide.familyItem.kind === "video") return;
+      evt.preventDefault();
+      if (window.FamilyTags) window.FamilyTags.togglePhoto(slide.familyItem);
     });
     lightbox.init();
     return lightbox;

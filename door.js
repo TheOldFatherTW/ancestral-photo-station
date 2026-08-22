@@ -61,7 +61,17 @@
     return /^[a-z][a-z0-9-]{0,31}$/.test(h) ? h : "";
   }
 
+  function onlyPerson() {
+    const ids = Object.keys(names);
+    return ids.length === 1 ? ids[0] : "";
+  }
+
   function showHome() {
+    const only = onlyPerson();
+    if (only) {
+      showAlbum(only, names[only]);
+      return;
+    }
     openPerson = "";
     if (window.FamilyFeed) window.FamilyFeed.stop();
     if (cabs) cabs.hidden = false;
@@ -293,8 +303,12 @@
       } else {
         paintBusy(cab.people);
       }
+      const people = cab.people || [];
       const back = document.querySelector("#album .back");
-      if (back) back.hidden = (cab.people || []).length < 2;
+      if (back) back.hidden = people.length < 2;
+      const homeWrap = document.querySelector(".local-cabs");
+      if (homeWrap) homeWrap.hidden = people.length < 2;
+      if (cabs) cabs.hidden = people.length < 2;
       window._familyRunning = (cab.people || []).some(function (p) {
         return p.sync === "running";
       });
@@ -306,6 +320,11 @@
 
   function route() {
     const id = personFromHash();
+    const only = onlyPerson();
+    if ((!id || !names[id]) && only) {
+      showAlbum(only, names[only]);
+      return;
+    }
     if (!id || !names[id]) {
       showHome();
       return;

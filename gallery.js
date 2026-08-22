@@ -247,8 +247,9 @@
         a.href = item.kind === "video" ? qs(item, "media") : qs(item, "thumb");
         const img = document.createElement("img");
         img.decoding = "async";
-        img.alt = item.who;
+        img.alt = "";
         bindThumb(img, qs(item, "thumb"), function () {
+          img.classList.add("is-on");
           const slide = slides[index];
           if (slide && img.naturalWidth && img.naturalHeight) {
             slide.width = img.naturalWidth;

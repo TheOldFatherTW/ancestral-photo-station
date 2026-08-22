@@ -46,7 +46,7 @@ body {
   touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
-  -webkit-touch-callout: none;
+  -webkit-touch-callout: none !important;
   -webkit-user-drag: none;
 }
 .tile:link,
@@ -71,6 +71,14 @@ body {
 }
 .tile img.is-on {
   opacity: 1;
+}
+.tile-shield {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: rgba(255, 255, 255, 0.01);
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none;
 }
 .tile.is-video::after {
   content: "";
@@ -570,6 +578,11 @@ a.cab {
   object-fit: contain;
   background: #000;
 }
+.pswp-vid-zoom {
+  position: absolute;
+  inset: 0 0 52px 0;
+  z-index: 1;
+}
 .vid-wait {
   position: absolute;
   left: 50%;
@@ -807,8 +820,6 @@ button, .btn {
   left: 0;
   bottom: 100%;
   margin-bottom: 4px;
-  transform: scale(calc(1 / var(--face-z, 1)));
-  transform-origin: left bottom;
   max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -860,8 +871,6 @@ button, .btn {
 .pswp-face > .ins-x {
   top: -8px;
   right: -8px;
-  transform: scale(calc(1 / var(--face-z, 1)));
-  transform-origin: right top;
 }
 .pswp-tag-sheet {
   position: absolute;
@@ -997,4 +1006,12 @@ button, .btn {
   .ins-icon.is-run .ins-ring {
     animation: none;
   }
+}
+.pswp,
+.pswp__img,
+.pswp__item,
+.pswp__zoom-wrap,
+.pswp__content {
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none;
 }

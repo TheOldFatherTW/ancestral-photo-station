@@ -5,6 +5,11 @@
   const THUMB_FAST = 8;
   const THUMB_SLOW = 3;
   const SELECT_MAX = 99;
+  document.addEventListener("contextmenu", function (ev) {
+    const t = ev.target && ev.target.closest;
+    if (!t) return;
+    if (ev.target.closest(".tile") || ev.target.closest(".pswp")) ev.preventDefault();
+  }, true);
   let run = 0;
   let lightbox;
   let thumbActive = 0;
@@ -97,7 +102,7 @@
   function paintPicked() {
     const feed = document.getElementById("feed");
     if (!feed) return;
-    feed.querySelectorAll("a.tile").forEach(function (a) {
+    feed.querySelectorAll(".tile").forEach(function (a) {
       markTile(a, selecting && picked[a.dataset.key]);
     });
     tellSelect();
@@ -212,7 +217,7 @@
           tileUrl.replace(/"/g, "") +
           '" src="' +
           src.replace(/"/g, "") +
-          '"></video><p class="vid-wait" hidden>影片準備中…</p></div>',
+          '"></video><p class="vid-wait" hidden>影片準備中…</p><div class="pswp-vid-zoom"></div></div>',
         msrc: tileUrl,
         width: box.w,
         height: box.h,
@@ -280,6 +285,10 @@
       imageClickAction: false,
       tapAction: false,
       maxZoomLevel: 12,
+    });
+    lightbox.addFilter("isContentZoomable", function (zoomable, content) {
+      if (content && content.data && content.data.html) return true;
+      return zoomable;
     });
     lightbox.addFilter("numItems", function () {
       return lightbox._slides ? lightbox._slides.length : 0;
@@ -420,7 +429,7 @@
       }
 
       function tile(item, index) {
-        const a = document.createElement("a");
+        const a = document.createElement("div");
         a.className = "tile" + (item.kind === "video" ? " is-video" : "");
         a.setAttribute("role", "button");
         a.tabIndex = 0;
@@ -432,7 +441,10 @@
         bindThumb(img, qs(item, "thumb", "tile"), function () {
           img.classList.add("is-on");
         });
+        const shield = document.createElement("span");
+        shield.className = "tile-shield";
         a.appendChild(img);
+        a.appendChild(shield);
         markTile(a, selecting && picked[a.dataset.key]);
         let press = 0;
         let sx = 0;
@@ -454,7 +466,7 @@
             press = 0;
             fromHold = true;
             enterSelect(item, a);
-          }, 480);
+          }, 400);
         });
         a.addEventListener("pointermove", function (ev) {
           if (!press) return;

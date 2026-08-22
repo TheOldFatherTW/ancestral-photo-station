@@ -323,7 +323,13 @@
 
     function renderSuggest() {
       suggest.innerHTML = "";
-      matches().forEach(function (hit) {
+      const hits = matches();
+      if (!hits.length) return;
+      const hint = document.createElement("p");
+      hint.className = "pswp-tag-suggest-hint";
+      hint.textContent = "點一下才會加上，光輸入不會存檔";
+      suggest.appendChild(hint);
+      hits.forEach(function (hit) {
         const pick = document.createElement("button");
         pick.type = "button";
         pick.textContent = "#" + hit.label;
@@ -391,8 +397,15 @@
     });
     node.appendChild(row);
 
+    let addClick = false;
+    go.addEventListener("pointerdown", function () {
+      addClick = true;
+    });
     form.addEventListener("submit", function (ev) {
       ev.preventDefault();
+      const byAdd = addClick;
+      addClick = false;
+      if (!byAdd) return;
       const label = (input.value || "").trim();
       if (!label) return;
       if (renaming) {
@@ -459,6 +472,12 @@
     faceLayer = null;
   }
 
+  function currentPswp() {
+    return window.FamilyFeed && typeof window.FamilyFeed.pswp === "function"
+      ? window.FamilyFeed.pswp()
+      : null;
+  }
+
   function layoutFaces() {
     const tick = faceTick;
     const img = currentPhotoImg();
@@ -479,12 +498,16 @@
       }, 120);
       return;
     }
-    if (layer.parentNode !== img.parentNode) img.parentNode.appendChild(layer);
+    const wrap = img.closest(".pswp__zoom-wrap") || img.parentNode;
+    if (layer.parentNode !== wrap) wrap.appendChild(layer);
     applyFaceCube();
     layer.style.left = img.offsetLeft + "px";
     layer.style.top = img.offsetTop + "px";
-    layer.style.width = img.clientWidth + "px";
-    layer.style.height = img.clientHeight + "px";
+    layer.style.width = img.offsetWidth + "px";
+    layer.style.height = img.offsetHeight + "px";
+    const pswp = currentPswp();
+    const z = (pswp && pswp.currSlide && pswp.currSlide.currZoomLevel) || 1;
+    layer.style.setProperty("--face-z", String(z > 0.05 ? z : 1));
   }
 
   function paintFaces(faces) {
@@ -544,6 +567,33 @@
     });
   }
 
+  function zoomToFaceIfTiny(id) {
+    const face = faceBoxes.filter(function (row) {
+      return row && row.id === id && row.bbox && row.bbox.length === 4;
+    })[0];
+    if (!face) return;
+    const img = currentPhotoImg();
+    const pswp = currentPswp();
+    const slide = pswp && pswp.currSlide;
+    if (!img || !slide || !slide.isZoomable || !slide.isZoomable()) return;
+    const rect = img.getBoundingClientRect();
+    const bw = Math.max(0, face.bbox[2] - face.bbox[0]);
+    const bh = Math.max(0, face.bbox[3] - face.bbox[1]);
+    const edge = Math.min(bw * rect.width, bh * rect.height);
+    if (edge < 2 || edge >= 80) return;
+    const want = 180;
+    const dest = Math.min(slide.zoomLevels.max, slide.currZoomLevel * (want / edge));
+    if (!(dest > slide.currZoomLevel * 1.08)) return;
+    pswp.zoomTo(
+      dest,
+      {
+        x: rect.left + ((face.bbox[0] + face.bbox[2]) / 2) * rect.width,
+        y: rect.top + ((face.bbox[1] + face.bbox[3]) / 2) * rect.height,
+      },
+      280
+    );
+  }
+
   function highlightFace(id) {
     selectedTag = id;
     if (faceLayer) {
@@ -564,6 +614,7 @@
         if (x) x.hidden = !on;
       });
     }
+    zoomToFaceIfTiny(id);
   }
 
   function photoQuery(item) {

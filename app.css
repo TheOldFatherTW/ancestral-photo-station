@@ -46,6 +46,8 @@ body {
   touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
 }
 .tile:link,
 .tile:visited,
@@ -61,6 +63,11 @@ body {
   display: block;
   opacity: 0;
   transition: opacity 0.28s ease;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
 }
 .tile img.is-on {
   opacity: 1;
@@ -800,6 +807,8 @@ button, .btn {
   left: 0;
   bottom: 100%;
   margin-bottom: 4px;
+  transform: scale(calc(1 / var(--face-z, 1)));
+  transform-origin: left bottom;
   max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -851,6 +860,8 @@ button, .btn {
 .pswp-face > .ins-x {
   top: -8px;
   right: -8px;
+  transform: scale(calc(1 / var(--face-z, 1)));
+  transform-origin: right top;
 }
 .pswp-tag-sheet {
   position: absolute;
@@ -936,6 +947,13 @@ button, .btn {
   flex-wrap: wrap;
   gap: 8px;
 }
+.pswp-tag-suggest-hint {
+  margin: 0 0 2px;
+  width: 100%;
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.72;
+}
 .pswp-tag-suggest button {
   margin: 0;
   width: auto;
@@ -943,9 +961,9 @@ button, .btn {
   font-weight: 600;
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
+  background: transparent;
   color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  border: 1px dashed rgba(255, 255, 255, 0.55);
   cursor: pointer;
 }
 @media (max-width: 560px) {

@@ -244,6 +244,7 @@
       clickToCloseNonZoomable: false,
       imageClickAction: false,
       tapAction: false,
+      maxZoomLevel: 12,
     });
     lightbox.addFilter("numItems", function () {
       return lightbox._slides ? lightbox._slides.length : 0;
@@ -314,6 +315,9 @@
         lightbox.pswp.on("resize", function () {
           if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
         });
+        lightbox.pswp.on("zoomPanUpdate", function () {
+          if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
+        });
       }
     });
     lightbox.init();
@@ -378,11 +382,13 @@
       function tile(item, index) {
         const a = document.createElement("a");
         a.className = "tile" + (item.kind === "video" ? " is-video" : "");
-        a.href = item.kind === "video" ? qs(item, "media") : qs(item, "thumb", "tile");
+        a.setAttribute("role", "button");
+        a.tabIndex = 0;
         a.dataset.key = itemKey(item);
         const img = document.createElement("img");
         img.decoding = "async";
         img.alt = "";
+        img.draggable = false;
         bindThumb(img, qs(item, "thumb", "tile"), function () {
           img.classList.add("is-on");
           const slide = slides[index];
@@ -428,8 +434,10 @@
         });
         a.addEventListener("pointerup", clearPress);
         a.addEventListener("pointercancel", clearPress);
-        a.addEventListener("contextmenu", function (ev) {
-          ev.preventDefault();
+        ["contextmenu", "selectstart", "dragstart"].forEach(function (name) {
+          a.addEventListener(name, function (ev) {
+            ev.preventDefault();
+          }, true);
         });
         a.addEventListener("click", function (ev) {
           ev.preventDefault();
@@ -583,6 +591,9 @@
     closeTrash: function () {
       if (!currentPerson) return;
       window.FamilyFeed.start(currentPerson, []);
+    },
+    pswp: function () {
+      return lightbox && lightbox.pswp;
     },
     stop: function () {
       run += 1;

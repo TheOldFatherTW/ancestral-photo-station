@@ -631,6 +631,44 @@ button, .btn {
   flex-wrap: wrap;
   gap: 8px;
 }
+.pswp-face-layer {
+  position: absolute;
+  pointer-events: none;
+  z-index: 15;
+  overflow: visible;
+}
+.pswp-face {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 1px rgba(214, 41, 118, 0.85);
+  border-radius: 10px;
+}
+.pswp-face.is-on {
+  border-color: #d62976;
+  box-shadow: 0 0 0 2px #fff;
+}
+.pswp-face span {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  margin-bottom: 4px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: linear-gradient(120deg, #fa7e1e 0%, #d62976 48%, #962fbf 100%);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.pswp-tag-sheet .tag-chip.is-on {
+  background: linear-gradient(120deg, #fa7e1e 0%, #d62976 48%, #962fbf 100%);
+  border-color: transparent;
+}
 .pswp-tag-sheet {
   position: absolute;
   left: 0;

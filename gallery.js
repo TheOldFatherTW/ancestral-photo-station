@@ -217,6 +217,12 @@
       if (window.FamilyTags && slide && slide.familyItem) {
         window.FamilyTags.showPhoto(slide.familyItem);
       }
+      if (lightbox.pswp && !lightbox._faceLay) {
+        lightbox._faceLay = true;
+        lightbox.pswp.on("resize", function () {
+          if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
+        });
+      }
     });
     lightbox.init();
     return lightbox;

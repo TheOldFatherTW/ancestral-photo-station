@@ -8,6 +8,8 @@
   let lastBoard = { groups: [], job: {} };
   let sheet = null;
   let sheetItem = null;
+  let faceLayer = null;
+  let faceBoxes = [];
 
   function api(path, opts) {
     const origin = (window.VAULT_ORIGIN || "").replace(/\/$/, "");
@@ -152,16 +154,18 @@
       chip.type = "button";
       chip.className = "tag-chip" + (RENAMEABLE[tag.kind] ? "" : " is-lock");
       chip.textContent = "#" + tag.label;
-      if (RENAMEABLE[tag.kind]) {
-        chip.addEventListener("click", function () {
-          const next = window.prompt("改名（所有照片一起改）", tag.label);
-          if (next == null || !String(next).trim()) return;
-          photoPost({ action: "rename", id: tag.id, label: next }).then(function (payload) {
-            paintSheet(payload);
-            load();
-          });
+      chip.dataset.id = tag.id;
+      chip.addEventListener("click", function () {
+        const again = chip.classList.contains("is-on");
+        highlightFace(tag.id);
+        if (!RENAMEABLE[tag.kind] || !again) return;
+        const next = window.prompt("改名（所有照片一起改）", tag.label);
+        if (next == null || !String(next).trim()) return;
+        photoPost({ action: "rename", id: tag.id, label: next }).then(function (payload) {
+          paintSheet(payload);
+          load();
         });
-      }
+      });
       row.appendChild(chip);
     });
     node.appendChild(row);
@@ -188,6 +192,92 @@
     form.appendChild(input);
     form.appendChild(add);
     node.appendChild(form);
+    paintFaces((data && data.photo && data.photo.faces) || []);
+  }
+
+  function currentPhotoImg() {
+    const items = document.querySelectorAll(".pswp__item");
+    let item = null;
+    items.forEach(function (el) {
+      if (el.getAttribute("aria-hidden") !== "true") item = el;
+    });
+    if (!item && items.length) item = items[0];
+    if (!item) return null;
+    const imgs = item.querySelectorAll("img.pswp__img");
+    let img = null;
+    imgs.forEach(function (el) {
+      if (!el.classList.contains("pswp__img--placeholder")) img = el;
+    });
+    return img || (imgs.length ? imgs[imgs.length - 1] : null);
+  }
+
+  function ensureFaceLayer() {
+    if (faceLayer && faceLayer.isConnected) return faceLayer;
+    faceLayer = document.createElement("div");
+    faceLayer.className = "pswp-face-layer";
+    return faceLayer;
+  }
+
+  function clearFaces() {
+    faceBoxes = [];
+    if (faceLayer) faceLayer.remove();
+    faceLayer = null;
+  }
+
+  function layoutFaces() {
+    const img = currentPhotoImg();
+    const layer = ensureFaceLayer();
+    if (!img || !faceBoxes.length || (sheetItem && sheetItem.kind === "video")) {
+      if (layer.parentNode) layer.remove();
+      return;
+    }
+    if (layer.parentNode !== img.parentNode) img.parentNode.appendChild(layer);
+    layer.style.left = img.offsetLeft + "px";
+    layer.style.top = img.offsetTop + "px";
+    layer.style.width = img.clientWidth + "px";
+    layer.style.height = img.clientHeight + "px";
+  }
+
+  function paintFaces(faces) {
+    faceBoxes = (faces || []).filter(function (face) {
+      return face && face.bbox && face.bbox.length === 4;
+    });
+    const layer = ensureFaceLayer();
+    layer.innerHTML = "";
+    faceBoxes.forEach(function (face) {
+      const box = document.createElement("div");
+      box.className = "pswp-face";
+      box.dataset.id = face.id;
+      const x1 = face.bbox[0];
+      const y1 = face.bbox[1];
+      const x2 = face.bbox[2];
+      const y2 = face.bbox[3];
+      box.style.left = x1 * 100 + "%";
+      box.style.top = y1 * 100 + "%";
+      box.style.width = Math.max(0, x2 - x1) * 100 + "%";
+      box.style.height = Math.max(0, y2 - y1) * 100 + "%";
+      const cap = document.createElement("span");
+      cap.textContent = face.label || "";
+      box.appendChild(cap);
+      layer.appendChild(box);
+    });
+    layoutFaces();
+    requestAnimationFrame(layoutFaces);
+    setTimeout(layoutFaces, 80);
+    setTimeout(layoutFaces, 320);
+  }
+
+  function highlightFace(id) {
+    if (faceLayer) {
+      faceLayer.querySelectorAll(".pswp-face").forEach(function (el) {
+        el.classList.toggle("is-on", el.dataset.id === id);
+      });
+    }
+    if (sheet) {
+      sheet.querySelectorAll(".tag-chip").forEach(function (el) {
+        el.classList.toggle("is-on", el.dataset.id === id);
+      });
+    }
   }
 
   function photoQuery(item) {
@@ -232,6 +322,7 @@
   function closePhoto() {
     sheetItem = null;
     if (sheet) sheet.hidden = true;
+    clearFaces();
   }
 
   window.FamilyTags = {
@@ -249,6 +340,7 @@
       if (!item || !item.person) return;
       loadPhoto(item);
     },
+    layoutFaces: layoutFaces,
     closePhoto: closePhoto,
   };
 })();

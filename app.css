@@ -26,6 +26,7 @@ body {
 .hall.with-feed {
   min-height: auto;
   justify-content: flex-start;
+  padding: calc(32px + env(safe-area-inset-top, 0px)) 16px calc(8px + env(safe-area-inset-bottom, 0px));
 }
 .feed {
   width: min(720px, 100%);

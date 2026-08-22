@@ -1,8 +1,11 @@
 {
+  "id": "./",
   "name": "家族照片備份",
   "short_name": "家族備份",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#fafafa",
   "theme_color": "#fafafa",
   "lang": "zh-Hant",
@@ -10,12 +13,14 @@
     {
       "src": "./icons/rose-two-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "./icons/rose-two-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }

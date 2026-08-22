@@ -343,7 +343,7 @@
 
   function fillHud(hud, p) {
     const backupRun = p.sync === "running";
-    const backupDone = p.sync === "synced";
+    const backupDone = !backupRun && (p.sync === "synced" || p.percent === 100);
     paintHp(hud.querySelector('.hp[data-kind="backup"]'), {
       running: backupRun,
       done: backupDone,

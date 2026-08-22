@@ -435,10 +435,27 @@ a.cab {
     rgba(0, 0, 0, 0.12) var(--cast, 0deg)
   );
 }
-.cab-trash,
-.album-trash,
-.pswp-trash {
+.rail-trash {
   touch-action: none;
+}
+.photo-rail {
+  position: fixed;
+  left: max(8px, env(safe-area-inset-left, 0px));
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 100010;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  pointer-events: none;
+}
+.photo-rail[hidden] {
+  display: none !important;
+}
+.photo-rail .ins-icon {
+  pointer-events: auto;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.18));
 }
 .ins-icon[hidden] {
   display: none !important;
@@ -729,26 +746,6 @@ button, .btn {
 .pswp-face-layer.is-off {
   display: none !important;
 }
-.pswp-trash.ins-icon {
-  position: absolute;
-  top: 10px;
-  right: 64px;
-  z-index: 21;
-  width: 48px;
-  height: 48px;
-  flex-basis: 48px;
-  color: #111;
-}
-.pswp-trash .ins-face {
-  inset: 3px;
-}
-.pswp-trash svg {
-  width: 20px;
-  height: 20px;
-}
-.pswp-trash[hidden] {
-  display: none !important;
-}
 .pswp-face-cube {
   position: absolute;
   top: 64px;
@@ -1001,10 +998,10 @@ button, .btn {
     height: 36px;
     flex-basis: 36px;
   }
-  .pswp-trash.ins-icon {
-    width: 48px;
-    height: 48px;
-    flex-basis: 48px;
+  .photo-rail .ins-icon {
+    width: 40px;
+    height: 40px;
+    flex-basis: 40px;
   }
   .mode-btn { font-size: 10px; padding: 7px 12px; }
 }

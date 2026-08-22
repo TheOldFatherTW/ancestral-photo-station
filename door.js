@@ -25,6 +25,8 @@
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8V6.8A1.8 1.8 0 0 1 9.8 5h4.4A1.8 1.8 0 0 1 16 6.8V8M5 8h14M9 11v7M12 11v7M15 11v7M7 8l.8 12.2A1.6 1.6 0 0 0 9.4 22h5.2a1.6 1.6 0 0 0 1.6-1.8L17 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const HASH =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4l-1.2 16M15.2 4l-1.2 16M4.5 9h15M4 15h15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  const DOWNLOAD =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 11.5L12 16l4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 19.5h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 
   function api(path) {
     const url = ORIGIN + path;
@@ -99,6 +101,7 @@
     if (feed) feed.innerHTML = "";
     const board = document.getElementById("tag-board");
     if (board) board.hidden = true;
+    showRail(false);
   }
 
   function showAlbum(person, name) {
@@ -113,6 +116,7 @@
     if (!solo && albumTitle) albumTitle.textContent = name || names[person] || person;
     if (albumCoverBtn) albumCoverBtn.dataset.person = person;
     if (window.FamilyTags) window.FamilyTags.show(person);
+    showRail(true);
     if (openPerson === person) return;
     openPerson = person;
     if (window.FamilyFeed) window.FamilyFeed.start(person);
@@ -274,18 +278,6 @@
       ev.stopPropagation();
       pickCover(p.id);
     });
-    const trash = insButton("cab-trash", TRASH, "丟進垃圾桶");
-    trash.hidden = true;
-    bindCastTrash(trash);
-    const hash = insButton("cab-hash", HASH, "新增多張標記");
-    hash.hidden = true;
-    hash.addEventListener("click", function (ev) {
-      ev.preventDefault();
-      ev.stopPropagation();
-      const label = window.prompt("要加到選取照片的標記名稱");
-      if (!label || !window.FamilyFeed) return;
-      window.FamilyFeed.tagSelected(label);
-    });
     const refresh = insButton("cab-refresh", REFRESH, "檢查並備份");
     refresh.addEventListener("click", function (ev) {
       ev.preventDefault();
@@ -300,8 +292,6 @@
     actions.className = "cab-actions";
     actions.appendChild(refresh);
     actions.appendChild(pick);
-    actions.appendChild(trash);
-    actions.appendChild(hash);
     const side = document.createElement("div");
     side.className = "cab-side";
     side.appendChild(bars);
@@ -511,6 +501,50 @@
     showAlbum(id, (link && link.dataset.name) || names[id] || id);
   }
 
+  function isRailStatus(text) {
+    return (
+      text.indexOf("已選") === 0 ||
+      text.indexOf("請點選") === 0 ||
+      text.indexOf("正在下載") === 0 ||
+      text.indexOf("已下載") === 0 ||
+      text.indexOf("已送出") === 0 ||
+      text === "正在看垃圾桶"
+    );
+  }
+
+  function showRail(on) {
+    const rail = ensureRail();
+    if (rail) rail.hidden = !on;
+  }
+
+  function ensureRail() {
+    const rail = document.getElementById("photo-rail");
+    if (!rail) return null;
+    if (rail.dataset.ready) return rail;
+    rail.dataset.ready = "1";
+    const hash = insButton("rail-hash", HASH, "新增標記");
+    hash.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (!window.FamilyFeed || !window.FamilyFeed.prepareAction()) return;
+      const label = window.prompt("要加上的標記名稱");
+      if (!label) return;
+      window.FamilyFeed.tagSelected(label);
+    });
+    const trash = insButton("rail-trash", TRASH, "丟進垃圾桶");
+    bindCastTrash(trash);
+    const down = insButton("rail-down", DOWNLOAD, "下載");
+    down.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (window.FamilyFeed) window.FamilyFeed.downloadSelected();
+    });
+    rail.appendChild(hash);
+    rail.appendChild(trash);
+    rail.appendChild(down);
+    return rail;
+  }
+
   if (albumCoverBtn) {
     albumCoverBtn.innerHTML = CAMERA;
     albumCoverBtn.addEventListener("click", function () {
@@ -533,39 +567,15 @@
         head.appendChild(tools);
       }
     }
-    if (!document.getElementById("album-trash-btn")) {
-      const trash = insButton("album-trash", TRASH, "丟進垃圾桶");
-      trash.id = "album-trash-btn";
-      trash.hidden = true;
-      bindCastTrash(trash);
-      const hash = insButton("album-hash", HASH, "新增多張標記");
-      hash.id = "album-hash-btn";
-      hash.hidden = true;
-      hash.addEventListener("click", function (ev) {
-        ev.preventDefault();
-        ev.stopPropagation();
-        const label = window.prompt("要加到選取照片的標記名稱");
-        if (!label || !window.FamilyFeed) return;
-        window.FamilyFeed.tagSelected(label);
-      });
-      tools.appendChild(trash);
-      tools.appendChild(hash);
-    }
   })();
   window.FamilyDoor = {
-    setSelect: function (count, inTrash) {
+    setSelect: function (count, inTrash, hint) {
       const n = Number(count) || 0;
-      const show = n > 0;
-      document.querySelectorAll(".cab-trash, .cab-hash, .album-trash, .album-hash").forEach(function (el) {
-        el.hidden = !show;
-      });
       if (statusEl) {
         if (inTrash) statusEl.textContent = "正在看垃圾桶";
-        else if (show) statusEl.textContent = "已選 " + n + " / 99";
-        else if (
-          statusEl.textContent.indexOf("已選") === 0 ||
-          statusEl.textContent === "正在看垃圾桶"
-        ) {
+        else if (hint) statusEl.textContent = hint;
+        else if (n > 0) statusEl.textContent = "已選 " + n + " / 99";
+        else if (isRailStatus(statusEl.textContent)) {
           statusEl.textContent = "";
         }
       }

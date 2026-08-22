@@ -14,7 +14,6 @@
   let faceTick = 0;
   let faceCtrl = null;
   let faceCube = null;
-  let trashBtn = null;
   let selectedTag = null;
 
   function api(path, opts) {
@@ -206,37 +205,6 @@
     const node = ensureFaceCube();
     if (host && node.parentNode !== host) host.appendChild(node);
     applyFaceCube();
-    return node;
-  }
-
-  function ensureTrashBtn() {
-    if (trashBtn && trashBtn.isConnected) return trashBtn;
-    trashBtn = document.createElement("button");
-    trashBtn.type = "button";
-    trashBtn.className = "ins-icon pswp-trash";
-    trashBtn.setAttribute("aria-label", "丟進垃圾桶");
-    trashBtn.title = "丟進垃圾桶";
-    trashBtn.innerHTML =
-      '<span class="ins-ring"></span><span class="ins-face"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8V6.8A1.8 1.8 0 0 1 9.8 5h4.4A1.8 1.8 0 0 1 16 6.8V8M5 8h14M9 11v7M12 11v7M15 11v7M7 8l.8 12.2A1.6 1.6 0 0 0 9.4 22h5.2a1.6 1.6 0 0 0 1.6-1.8L17 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
-    trashBtn.addEventListener("click", function (ev) {
-      ev.preventDefault();
-      ev.stopPropagation();
-      if (!sheetItem) return;
-      const ok = window.confirm("把這張丟進垃圾桶？三天內可在垃圾桶救回。");
-      if (!ok) return;
-      photoPost({ action: "trash" }).then(function () {
-        closePhoto();
-        if (window.FamilyFeed && window.FamilyFeed.refresh) window.FamilyFeed.refresh();
-      });
-    });
-    return trashBtn;
-  }
-
-  function hostTrashBtn() {
-    const host = document.querySelector(".pswp");
-    const node = ensureTrashBtn();
-    if (host && node.parentNode !== host) host.appendChild(node);
-    node.hidden = !sheetItem;
     return node;
   }
 
@@ -669,7 +637,6 @@
     node.hidden = false;
     node.classList.toggle("is-video", item.kind === "video");
     hostFaceCube();
-    hostTrashBtn();
     if (faceCtrl) faceCtrl.abort();
     faceCtrl = new AbortController();
     const ac = faceCtrl;
@@ -697,7 +664,6 @@
     if (faceCtrl) faceCtrl.abort();
     if (sheet) sheet.hidden = true;
     if (faceCube) faceCube.hidden = true;
-    if (trashBtn) trashBtn.hidden = true;
     clearFaces();
   }
 

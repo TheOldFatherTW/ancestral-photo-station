@@ -21,6 +21,7 @@
   let trashMode = false;
   let selecting = false;
   let picked = {};
+  let selectHint = "";
 
   function api(path) {
     const url = ORIGIN + path;
@@ -88,9 +89,11 @@
     return Object.keys(picked).length;
   }
 
-  function tellSelect() {
+  function tellSelect(hint) {
+    if (hint !== undefined) selectHint = hint || "";
+    if (pickCount() > 0) selectHint = "";
     if (window.FamilyDoor && window.FamilyDoor.setSelect) {
-      window.FamilyDoor.setSelect(selecting ? pickCount() : 0, trashMode);
+      window.FamilyDoor.setSelect(selecting ? pickCount() : 0, trashMode, selectHint);
     }
   }
 
@@ -142,7 +145,161 @@
   function clearSelect() {
     selecting = false;
     picked = {};
+    selectHint = "";
     paintPicked();
+  }
+
+  function viewingItem() {
+    if (!lightbox || !lightbox.pswp || !lightbox._slides) return null;
+    if (!document.querySelector(".pswp--open")) return null;
+    const slide = lightbox._slides[lightbox.pswp.currIndex];
+    return (slide && slide.familyItem) || null;
+  }
+
+  function targetItems() {
+    const keys = Object.keys(picked);
+    if (keys.length) {
+      return keys.map(function (key) {
+        return picked[key];
+      });
+    }
+    const one = viewingItem();
+    return one ? [one] : [];
+  }
+
+  function targetRows() {
+    return targetItems().map(function (item) {
+      return { person: item.person, bucket: item.bucket, rel: item.rel };
+    });
+  }
+
+  function prepareAction() {
+    if (targetItems().length) return true;
+    if (selecting) {
+      clearSelect();
+      return false;
+    }
+    selecting = true;
+    tellSelect("請點選照片，可一張或多張，再按一次");
+    return false;
+  }
+
+  function note(msg) {
+    const el = document.getElementById("status");
+    if (el) el.textContent = msg || "";
+  }
+
+  function downloadName(item, mime) {
+    let name = String(item.rel || "photo").split(/[/\\]/).pop() || "photo";
+    mime = String(mime || "");
+    if (/\.hei[cf]$/i.test(name) && mime.indexOf("jpeg") >= 0) {
+      name = name.replace(/\.hei[cf]$/i, ".jpg");
+    }
+    if (item.kind === "video" && mime.indexOf("mp4") >= 0 && /\.(mov|m4v)$/i.test(name)) {
+      name = name.replace(/\.(mov|m4v)$/i, ".mp4");
+    }
+    return name;
+  }
+
+  function blobFile(item) {
+    return fetch(qs(item, "media"))
+      .then(function (res) {
+        if (!res.ok) throw new Error("bad");
+        return res.blob();
+      })
+      .then(function (blob) {
+        const mime = blob.type || (item.kind === "video" ? "video/mp4" : "image/jpeg");
+        return new File([blob], downloadName(item, mime), { type: mime });
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
+  function clickDownload(file) {
+    const href = URL.createObjectURL(file);
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = file.name;
+    a.rel = "noopener";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(function () {
+      URL.revokeObjectURL(href);
+    }, 8000);
+  }
+
+  function wait(ms) {
+    return new Promise(function (resolve) {
+      window.setTimeout(resolve, ms);
+    });
+  }
+
+  function saveItems(items) {
+    if (!items.length) return Promise.resolve();
+    const batch = items.length <= 8;
+    note(items.length > 1 ? "正在下載 1 / " + items.length : "正在下載…");
+    function shareOrSave(files) {
+      if (!files.length) {
+        note("現在下載不了，請再試一次");
+        return Promise.resolve();
+      }
+      if (navigator.canShare && navigator.canShare({ files: files })) {
+        return navigator.share({ files: files }).then(
+          function () {
+            note(files.length > 1 ? "已送出 " + files.length + " 張" : "已送出");
+            clearSelect();
+          },
+          function (err) {
+            if (err && err.name === "AbortError") {
+              note("");
+              return;
+            }
+            files.forEach(clickDownload);
+            note(files.length > 1 ? "已下載 " + files.length + " 張" : "已下載");
+            clearSelect();
+          }
+        );
+      }
+      files.forEach(clickDownload);
+      note(files.length > 1 ? "已下載 " + files.length + " 張" : "已下載");
+      clearSelect();
+      return Promise.resolve();
+    }
+    if (batch) {
+      const files = [];
+      let chain = Promise.resolve();
+      items.forEach(function (item, i) {
+        chain = chain.then(function () {
+          note("正在下載 " + (i + 1) + " / " + items.length);
+          return blobFile(item).then(function (file) {
+            if (file) files.push(file);
+          });
+        });
+      });
+      return chain.then(function () {
+        return shareOrSave(files);
+      });
+    }
+    let chain = Promise.resolve();
+    let saved = 0;
+    items.forEach(function (item, i) {
+      chain = chain.then(function () {
+        note("正在下載 " + (i + 1) + " / " + items.length);
+        return blobFile(item).then(function (file) {
+          if (!file) return;
+          clickDownload(file);
+          saved += 1;
+          return wait(400);
+        });
+      });
+    });
+    return chain.then(function () {
+      note(saved ? "已下載 " + saved + " 張" : "現在下載不了，請再試一次");
+      if (saved) clearSelect();
+    });
   }
 
   function tagPost(body) {
@@ -153,13 +310,6 @@
       body: JSON.stringify(body),
     }).then(function (res) {
       return res.json();
-    });
-  }
-
-  function pickedRows() {
-    return Object.keys(picked).map(function (key) {
-      const item = picked[key];
-      return { person: item.person, bucket: item.bucket, rel: item.rel };
     });
   }
 
@@ -345,6 +495,7 @@
         v.pause();
       });
       if (window.FamilyTags) window.FamilyTags.closePhoto();
+      tellSelect();
     });
     lightbox.on("afterInit", function () {
       const pswp = lightbox.pswp;
@@ -376,6 +527,7 @@
       if (window.FamilyTags && slide && slide.familyItem) {
         window.FamilyTags.showPhoto(slide.familyItem);
       }
+      tellSelect();
     });
     lightbox.init();
     return lightbox;
@@ -603,10 +755,17 @@
       if (lightbox && lightbox.pswp) lightbox.pswp.close();
       window.FamilyFeed.start(currentPerson, currentTags, { trash: trashMode });
     },
+    prepareAction: function () {
+      return prepareAction();
+    },
     trashSelected: function () {
-      const rows = pickedRows();
-      if (!rows.length) return Promise.resolve();
-      if (!window.confirm("把選取的 " + rows.length + " 張丟進垃圾桶？三天內可救回。")) {
+      const rows = targetRows();
+      if (!rows.length) {
+        prepareAction();
+        return Promise.resolve();
+      }
+      const word = rows.length === 1 ? "這張" : "選取的 " + rows.length + " 張";
+      if (!window.confirm("把" + word + "丟進垃圾桶？三天內可救回。")) {
         return Promise.resolve();
       }
       return tagPost({
@@ -619,7 +778,7 @@
       });
     },
     tagSelected: function (label) {
-      const rows = pickedRows();
+      const rows = targetRows();
       const name = String(label || "").trim().replace(/^#/, "");
       if (!rows.length || !name) return Promise.resolve();
       return tagPost({
@@ -632,6 +791,10 @@
         clearSelect();
         window.FamilyFeed.start(currentPerson, currentTags, { trash: trashMode });
       });
+    },
+    downloadSelected: function () {
+      if (!prepareAction()) return Promise.resolve();
+      return saveItems(targetItems());
     },
     openTrash: function () {
       if (!currentPerson) return;

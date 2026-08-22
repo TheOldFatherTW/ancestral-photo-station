@@ -1,0 +1,25 @@
+---
+description: 任何會上線的改動都必須立刻 push 到 GitHub；使用者只在 iOS 用 Pages 測試，不用本機。
+alwaysApply: true
+---
+
+# 改完一定要推 GitHub
+
+使用者**從不在本機開網頁測試**。驗證一律用 iOS（iPhone／iPad）開 GitHub Pages：
+
+https://theoldfathertw.github.io/ancestral-photo-station/
+
+因此：改任何會出現在這個網址的東西，**沒有 push 就等於沒改**。
+
+## 必做
+
+- 遠端 `origin` = `https://github.com/TheOldFatherTW/ancestral-photo-station.git`。
+- 一律在 **`main` 上 commit 並 `git push origin main`**。不要開 PR、不要只留本機。
+- 任務結束前就要推，**不必等使用者再說「幫我上傳」**。這專案覆蓋「沒要求就不要 commit」的通用習慣。
+- 改 `app.css`／`*.js` 時一併提高 `index.html` 的 `?v=`，否則 Safari 會繼續用舊快取。
+- push 成功後告訴使用者：Pages 約 1–2 分鐘後更新，請 Safari **硬重新整理**。
+
+## 不要
+
+- 不要以為存檔或 Cursor 預覽等於上線。
+- 不要把 `status.json`、金鑰、無關二進位一併提交，除非使用者明確要。

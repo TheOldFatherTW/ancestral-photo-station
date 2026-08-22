@@ -41,7 +41,7 @@
       }
       function onErr() {
         settle();
-        if (tries >= 3) return;
+        if (tries >= 1) return;
         tries += 1;
         window.setTimeout(function () {
           thumbWait.push(start);
@@ -272,11 +272,18 @@
         return a;
       }
 
+      function sentinelNear() {
+        if (!sentinel || sentinel.hidden) return false;
+        const box = sentinel.getBoundingClientRect();
+        return box.top < (window.innerHeight || 0) + 1600;
+      }
+
       async function loadMore() {
         if (loading || my !== run) return;
         if (total && offset >= total) return;
         loading = true;
         showHint();
+        let got = 0;
         try {
           const url = api(
             "/api/photos?person=" +
@@ -303,17 +310,23 @@
             slides.push(slideFor(item, a));
             feed.appendChild(a);
           });
-          offset += (data.items || []).length;
+          got = (data.items || []).length;
+          offset += got;
           if (!offset) {
             feed.innerHTML = '<p class="feed-empty">這個櫃子還沒有照片。</p>';
           }
         } catch (err) {
           if (my !== run) return;
-          feed.innerHTML =
-            '<p class="feed-empty">目前無法連上,請聯絡維護的那個傢伙</p>';
+          if (!offset) {
+            feed.innerHTML =
+              '<p class="feed-empty">目前無法連上,請聯絡維護的那個傢伙</p>';
+          }
         } finally {
           loading = false;
           showHint();
+        }
+        if (my === run && got > 0 && (!total || offset < total) && sentinelNear()) {
+          loadMore();
         }
       }
 

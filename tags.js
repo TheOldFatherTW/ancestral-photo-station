@@ -12,6 +12,7 @@
   let faceBoxes = [];
   let faceTick = 0;
   let faceCtrl = null;
+  let faceCube = null;
 
   function api(path, opts) {
     const origin = (window.VAULT_ORIGIN || "").replace(/\/$/, "");
@@ -134,18 +135,75 @@
     return node;
   }
 
-  function catalogOf(kind, exceptId, query) {
+  function catalogOf(query, opts) {
     const q = String(query || "").trim().toLowerCase();
     if (!q) return [];
+    opts = opts || {};
     const hits = [];
     (lastBoard.groups || []).forEach(function (group) {
       (group.tags || []).forEach(function (tag) {
-        if (!tag || tag.id === exceptId || tag.kind !== kind) return;
+        if (!tag) return;
+        if (opts.kind && tag.kind !== opts.kind) return;
+        if (opts.exceptId && tag.id === opts.exceptId) return;
+        if (opts.exceptIds && opts.exceptIds[tag.id]) return;
         if (String(tag.label || "").toLowerCase().indexOf(q) < 0) return;
         hits.push(tag);
       });
     });
     return hits.slice(0, 8);
+  }
+
+  function faceCubeOn() {
+    try {
+      return localStorage.getItem("family.faceCube") !== "0";
+    } catch (e) {
+      return true;
+    }
+  }
+
+  function applyFaceCube() {
+    const on = faceCubeOn();
+    if (faceCube) {
+      const box = faceCube.querySelector("input");
+      if (box) box.checked = on;
+      faceCube.hidden = !sheetItem || sheetItem.kind === "video";
+    }
+    if (faceLayer) faceLayer.classList.toggle("is-off", !on);
+  }
+
+  function ensureFaceCube() {
+    if (faceCube && faceCube.isConnected) return faceCube;
+    faceCube = document.createElement("label");
+    faceCube.className = "pswp-face-cube";
+    const name = document.createElement("span");
+    name.className = "pswp-face-cube-name";
+    name.textContent = "face cube";
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.setAttribute("role", "switch");
+    box.setAttribute("aria-label", "face cube");
+    box.checked = faceCubeOn();
+    const sw = document.createElement("span");
+    sw.className = "pswp-face-cube-sw";
+    box.addEventListener("change", function () {
+      try {
+        localStorage.setItem("family.faceCube", box.checked ? "1" : "0");
+      } catch (e) {}
+      applyFaceCube();
+      if (box.checked) layoutFaces();
+    });
+    faceCube.appendChild(name);
+    faceCube.appendChild(box);
+    faceCube.appendChild(sw);
+    return faceCube;
+  }
+
+  function hostFaceCube() {
+    const host = document.querySelector(".pswp");
+    const node = ensureFaceCube();
+    if (host && node.parentNode !== host) host.appendChild(node);
+    applyFaceCube();
+    return node;
   }
 
   function paintSheet(data) {
@@ -159,6 +217,10 @@
     const row = document.createElement("div");
     row.className = "pswp-tag-row";
     const tags = (data && data.photo && data.photo.tags) || [];
+    const onPhoto = {};
+    tags.forEach(function (tag) {
+      if (tag && tag.id) onPhoto[tag.id] = true;
+    });
     if (!tags.length) {
       const empty = document.createElement("span");
       empty.textContent = "還沒有標記";
@@ -169,23 +231,14 @@
     let renaming = null;
     const form = document.createElement("form");
     form.className = "pswp-tag-add";
-    const renameBox = document.createElement("div");
-    renameBox.className = "pswp-tag-rename";
-    renameBox.hidden = true;
-    const renameHint = document.createElement("p");
-    renameHint.className = "pswp-tag-title";
-    const renameForm = document.createElement("form");
-    renameForm.className = "pswp-tag-add";
-    const renameInput = document.createElement("input");
-    renameInput.type = "text";
-    renameInput.maxLength = 48;
-    renameInput.placeholder = "改名或輸入既有標記";
-    const renameOk = document.createElement("button");
-    renameOk.type = "submit";
-    renameOk.textContent = "確定";
-    const renameCancel = document.createElement("button");
-    renameCancel.type = "button";
-    renameCancel.textContent = "取消";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.maxLength = 48;
+    input.placeholder = "輸入標記名稱";
+    input.setAttribute("enterkeyhint", "done");
+    const go = document.createElement("button");
+    go.type = "submit";
+    go.textContent = "新增";
     const suggest = document.createElement("div");
     suggest.className = "pswp-tag-suggest";
 
@@ -202,29 +255,40 @@
       photoPost({ action: "merge", id: src.id, into: dst.id }).then(afterChange);
     }
 
+    function matches() {
+      const q = input.value;
+      if (renaming) return catalogOf(q, { kind: renaming.kind, exceptId: renaming.id });
+      return catalogOf(q, { exceptIds: onPhoto });
+    }
+
     function renderSuggest() {
       suggest.innerHTML = "";
-      if (!renaming) return;
-      catalogOf(renaming.kind, renaming.id, renameInput.value).forEach(function (hit) {
+      matches().forEach(function (hit) {
         const pick = document.createElement("button");
         pick.type = "button";
         pick.textContent = "#" + hit.label;
         pick.addEventListener("click", function () {
-          askMerge(renaming, hit);
+          if (renaming) askMerge(renaming, hit);
+          else photoPost({ action: "attach", id: hit.id }).then(afterChange);
         });
         suggest.appendChild(pick);
       });
     }
 
-    function openRename(tag) {
-      renaming = tag;
-      form.hidden = true;
-      renameBox.hidden = false;
-      renameHint.textContent = "改名「" + tag.label + "」（所有照片一起改）";
-      renameInput.value = tag.label;
+    function exitRename() {
+      renaming = null;
+      go.textContent = "新增";
+      input.value = "";
       renderSuggest();
-      renameInput.focus();
-      renameInput.select();
+    }
+
+    function enterRename(tag) {
+      renaming = tag;
+      go.textContent = "改名";
+      input.value = tag.label;
+      renderSuggest();
+      input.focus();
+      input.select();
     }
 
     tags.forEach(function (tag) {
@@ -236,57 +300,55 @@
       chip.addEventListener("click", function () {
         const again = chip.classList.contains("is-on");
         highlightFace(tag.id);
-        if (!RENAMEABLE[tag.kind] || !again) return;
-        openRename(tag);
+        if (renaming && renaming.id === tag.id) {
+          exitRename();
+          return;
+        }
+        if (!RENAMEABLE[tag.kind] || !again) {
+          if (renaming) exitRename();
+          return;
+        }
+        enterRename(tag);
       });
       row.appendChild(chip);
     });
     node.appendChild(row);
 
-    const input = document.createElement("input");
-    input.type = "text";
-    input.maxLength = 48;
-    input.placeholder = "新增標記";
-    input.setAttribute("enterkeyhint", "done");
-    const add = document.createElement("button");
-    add.type = "submit";
-    add.textContent = "加入";
     form.addEventListener("submit", function (ev) {
       ev.preventDefault();
       const label = (input.value || "").trim();
       if (!label) return;
-      photoPost({ action: "create_on_photo", kind: "event", label: label }).then(afterChange);
-    });
-    form.appendChild(input);
-    form.appendChild(add);
-    node.appendChild(form);
-
-    renameInput.addEventListener("input", renderSuggest);
-    renameForm.addEventListener("submit", function (ev) {
-      ev.preventDefault();
-      const next = (renameInput.value || "").trim();
-      if (!next || !renaming) return;
-      const exact = catalogOf(renaming.kind, renaming.id, next).filter(function (hit) {
-        return String(hit.label) === next;
-      });
-      if (exact.length === 1) {
-        askMerge(renaming, exact[0]);
+      if (renaming) {
+        const exact = matches().filter(function (hit) {
+          return String(hit.label) === label;
+        });
+        if (exact.length === 1) {
+          askMerge(renaming, exact[0]);
+          return;
+        }
+        photoPost({ action: "rename", id: renaming.id, label: label }).then(afterChange);
         return;
       }
-      photoPost({ action: "rename", id: renaming.id, label: next }).then(afterChange);
+      const exact = matches().filter(function (hit) {
+        return String(hit.label) === label;
+      });
+      if (exact.length === 1) {
+        photoPost({ action: "attach", id: exact[0].id }).then(afterChange);
+        return;
+      }
+      photoPost({ action: "create_on_photo", kind: "event", label: label }).then(afterChange);
     });
-    renameCancel.addEventListener("click", function () {
-      renaming = null;
-      renameBox.hidden = true;
-      form.hidden = false;
+    input.addEventListener("input", renderSuggest);
+    input.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape" && renaming) {
+        ev.preventDefault();
+        exitRename();
+      }
     });
-    renameForm.appendChild(renameInput);
-    renameForm.appendChild(renameOk);
-    renameForm.appendChild(renameCancel);
-    renameBox.appendChild(renameHint);
-    renameBox.appendChild(renameForm);
-    renameBox.appendChild(suggest);
-    node.appendChild(renameBox);
+    form.appendChild(input);
+    form.appendChild(go);
+    node.appendChild(form);
+    node.appendChild(suggest);
     paintFaces((data && data.photo && data.photo.faces) || []);
   }
 
@@ -328,6 +390,7 @@
       if (layer.parentNode) layer.remove();
       return;
     }
+    applyFaceCube();
     if (!faceBoxes.length) {
       if (layer.parentNode) layer.remove();
       return;
@@ -340,6 +403,7 @@
       return;
     }
     if (layer.parentNode !== img.parentNode) img.parentNode.appendChild(layer);
+    applyFaceCube();
     layer.style.left = img.offsetLeft + "px";
     layer.style.top = img.offsetTop + "px";
     layer.style.width = img.clientWidth + "px";
@@ -420,6 +484,7 @@
     const node = hostSheet();
     node.hidden = false;
     node.classList.toggle("is-video", item.kind === "video");
+    hostFaceCube();
     if (faceCtrl) faceCtrl.abort();
     faceCtrl = new AbortController();
     const ac = faceCtrl;
@@ -446,6 +511,7 @@
     sheetItem = null;
     if (faceCtrl) faceCtrl.abort();
     if (sheet) sheet.hidden = true;
+    if (faceCube) faceCube.hidden = true;
     clearFaces();
   }
 

@@ -190,8 +190,22 @@ a.cab {
   gap: 12px;
   width: 100%;
 }
-.cab-bars {
+.cab-side {
   flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+}
+.cab-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.cab-bars {
+  flex: 0 0 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -255,6 +269,14 @@ a.cab {
   aspect-ratio: 1 / 1;
   height: auto;
   border-radius: 50%;
+  overflow: visible;
+  background: transparent;
+}
+.cab-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
   background: conic-gradient(
     from 210deg,
     #feda75 0deg,
@@ -264,15 +286,18 @@ a.cab {
     #4f5bd5 280deg,
     #feda75 360deg
   );
-  overflow: hidden;
+}
+.cab-cover.is-run .cab-ring {
+  animation: ins-spin 2.8s linear infinite;
 }
 .cab-face {
   position: absolute;
-  inset: 3px;
+  inset: 4px;
   border-radius: 50%;
-  border: 3px solid var(--bg);
+  border: 2px solid var(--bg);
   background: var(--bg);
   overflow: hidden;
+  z-index: 1;
 }
 .cab-face img {
   position: absolute;
@@ -295,7 +320,6 @@ a.cab {
   font-weight: 600;
   color: var(--mute);
 }
-.cab-pick,
 .cab-now,
 .cover-change {
   margin: 0;
@@ -307,54 +331,54 @@ a.cab {
   border-radius: 999px;
   cursor: pointer;
 }
-.cab-pick {
-  position: absolute;
-  top: auto;
-  right: 2%;
-  bottom: 2%;
-  width: 36px;
-  height: 36px;
+.ins-icon {
+  position: relative;
+  width: 40px;
+  height: 40px;
   padding: 0;
   margin: 0;
   border: 0;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 0 0 2px var(--bg);
+  background: transparent;
   color: var(--ink);
-  z-index: 3;
-}
-.cab-refresh {
-  position: absolute;
-  top: auto;
-  right: 28%;
-  bottom: 2%;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  margin: 0;
-  border: 0;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 0 0 2px var(--bg);
-  color: var(--ink);
-  z-index: 3;
   cursor: pointer;
+  flex: 0 0 40px;
 }
-.cab-pick svg,
-.cab-refresh svg,
+.ins-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 210deg,
+    #feda75 0deg,
+    #fa7e1e 70deg,
+    #d62976 140deg,
+    #962fbf 210deg,
+    #4f5bd5 280deg,
+    #feda75 360deg
+  );
+}
+.ins-icon.is-run .ins-ring {
+  animation: ins-spin 2.4s linear infinite;
+}
+.ins-face {
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+.ins-icon svg,
 .cover-change svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   display: block;
 }
-.cab-refresh.is-run svg {
-  animation: cab-spin 1.1s linear infinite;
+@keyframes ins-spin {
+  to { transform: rotate(360deg); }
 }
 @keyframes cab-spin {
   to { transform: rotate(360deg); }
@@ -517,6 +541,44 @@ button, .btn {
   margin: 18px auto 0;
   text-align: left;
 }
+.mode-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.mode-btn {
+  margin: 0;
+  width: auto;
+  font-family: Unbounded, "Segoe UI", sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--line);
+  cursor: pointer;
+}
+.mode-btn.is-on,
+.mode-pick:not(:disabled) {
+  color: #fff;
+  box-shadow: none;
+  background: linear-gradient(120deg, #fa7e1e 0%, #d62976 48%, #962fbf 100%);
+}
+.mode-pick {
+  margin-left: auto;
+}
+.mode-pick:disabled {
+  color: var(--mute);
+  background: #fff;
+  box-shadow: inset 0 0 0 1.5px var(--line);
+  opacity: 0.55;
+  cursor: default;
+}
 .tag-job,
 .tag-tools {
   margin: 0 0 10px;
@@ -556,9 +618,13 @@ button, .btn {
 }
 .tag-board button.tag-edit.is-on,
 .tag-board button.tag-chip.is-on {
-  background: var(--rose);
-  border-color: var(--rose);
+  background: linear-gradient(120deg, #fa7e1e 0%, #d62976 48%, #962fbf 100%);
+  border-color: transparent;
   color: #fff;
+}
+.pswp-tag-sheet .tag-chip.is-lock {
+  cursor: default;
+  opacity: 0.88;
 }
 .tag-row {
   display: flex;
@@ -638,4 +704,33 @@ button, .btn {
 }
 @media (max-width: 560px) {
   .credit { white-space: normal; }
+  .local-cabs.solo .cab-hud {
+    width: 100%;
+    gap: 12px;
+  }
+  .local-cabs.solo .cab-wrap {
+    width: min(104px, 30vw);
+  }
+  .hp-track { height: 14px; }
+  .hp-label { font-size: 12px; }
+  .ins-icon {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+  }
+  .mode-btn { font-size: 10px; padding: 7px 12px; }
+}
+@media (min-width: 768px) {
+  .local-cabs.solo .cab-hud { width: min(600px, 100%); }
+  .local-cabs.solo .cab-wrap { width: 156px; }
+}
+@media (min-width: 1100px) {
+  .local-cabs.solo .cab-wrap { width: 176px; }
+  .hp-track { height: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cab-cover.is-run .cab-ring,
+  .ins-icon.is-run .ins-ring {
+    animation: none;
+  }
 }

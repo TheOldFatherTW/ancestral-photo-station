@@ -1,10 +1,13 @@
 (function () {
   const ORIGIN = (window.VAULT_ORIGIN || "").replace(/\/$/, "");
+  const FIRST = 12;
   const LIMIT = 24;
-  const THUMB_SLOTS = 4;
+  const THUMB_FAST = 8;
+  const THUMB_SLOW = 3;
   let run = 0;
   let lightbox;
   let thumbActive = 0;
+  let thumbSlots = THUMB_FAST;
   const thumbWait = [];
   let paintHint = function () {};
 
@@ -16,7 +19,7 @@
   }
 
   function pumpThumbs() {
-    while (thumbActive < THUMB_SLOTS && thumbWait.length) {
+    while (thumbActive < thumbSlots && thumbWait.length) {
       const job = thumbWait.shift();
       thumbActive += 1;
       job(function () {
@@ -255,6 +258,7 @@
       let loading = false;
       let lastGroup = "";
       const slides = [];
+      thumbSlots = THUMB_FAST;
       feed.innerHTML = "";
       feed.dataset.person = person;
       feed.dataset.tags = (tagIds || []).join(",");
@@ -279,11 +283,11 @@
       function tile(item, index) {
         const a = document.createElement("a");
         a.className = "tile" + (item.kind === "video" ? " is-video" : "");
-        a.href = item.kind === "video" ? qs(item, "media") : qs(item, "thumb");
+        a.href = item.kind === "video" ? qs(item, "media") : qs(item, "thumb", "tile");
         const img = document.createElement("img");
         img.decoding = "async";
         img.alt = "";
-        bindThumb(img, qs(item, "thumb"), function () {
+        bindThumb(img, qs(item, "thumb", "tile"), function () {
           img.classList.add("is-on");
           const slide = slides[index];
           if (slide && img.naturalWidth && img.naturalHeight) {
@@ -330,7 +334,7 @@
             "&offset=" +
             offset +
             "&limit=" +
-            LIMIT;
+            (offset ? LIMIT : FIRST);
           if (tags.length) path += "&tags=" + tags.map(encodeURIComponent).join(",");
           const url = api(path);
           const res = await fetch(url);
@@ -352,6 +356,7 @@
           });
           got = (data.items || []).length;
           offset += got;
+          if (offset >= FIRST) thumbSlots = THUMB_SLOW;
           if (!offset) {
             feed.innerHTML = '<p class="feed-empty">這個櫃子還沒有照片。</p>';
           }
@@ -366,7 +371,10 @@
           showHint();
         }
         if (my === run && got > 0 && (!total || offset < total) && sentinelNear()) {
-          loadMore();
+          if (offset > FIRST) loadMore();
+          else window.setTimeout(function () {
+            if (my === run && sentinelNear()) loadMore();
+          }, 280);
         }
       }
 
@@ -377,7 +385,7 @@
           function (entries) {
             if (entries.some(function (e) { return e.isIntersecting; })) loadMore();
           },
-          { rootMargin: "1600px 0px" }
+          { rootMargin: "600px 0px" }
         );
         window.feedObserver.observe(sentinel);
       }

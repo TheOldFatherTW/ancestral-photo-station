@@ -160,6 +160,22 @@
     }
   }
 
+  function insButton(className, svg, label) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "ins-icon " + className;
+    btn.setAttribute("aria-label", label);
+    btn.title = label;
+    const ring = document.createElement("span");
+    ring.className = "ins-ring";
+    const face = document.createElement("span");
+    face.className = "ins-face";
+    face.innerHTML = svg;
+    btn.appendChild(ring);
+    btn.appendChild(face);
+    return btn;
+  }
+
   function cabCard(p) {
     const hud = document.createElement("div");
     hud.className = "cab-hud";
@@ -173,6 +189,8 @@
     a.setAttribute("aria-label", p.display_name);
     const cover = document.createElement("div");
     cover.className = "cab-cover";
+    const ring = document.createElement("div");
+    ring.className = "cab-ring";
     const face = document.createElement("div");
     face.className = "cab-face";
     if (p.has_cover) {
@@ -187,39 +205,36 @@
       empty.textContent = p.display_name;
       face.appendChild(empty);
     }
+    cover.appendChild(ring);
     cover.appendChild(face);
     a.appendChild(cover);
-    const pick = document.createElement("button");
-    pick.type = "button";
-    pick.className = "cab-pick";
-    pick.innerHTML = CAMERA;
-    pick.setAttribute("aria-label", p.has_cover ? "換封面" : "選封面");
-    pick.title = p.has_cover ? "換封面" : "選封面";
+    wrap.appendChild(a);
+    const pick = insButton("cab-pick", CAMERA, p.has_cover ? "換封面" : "選封面");
     pick.addEventListener("click", function (ev) {
       ev.preventDefault();
       ev.stopPropagation();
       pickCover(p.id);
     });
-    const refresh = document.createElement("button");
-    refresh.type = "button";
-    refresh.className = "cab-refresh";
-    refresh.innerHTML = REFRESH;
-    refresh.setAttribute("aria-label", "檢查並備份");
-    refresh.title = "檢查並備份";
+    const refresh = insButton("cab-refresh", REFRESH, "檢查並備份");
     refresh.addEventListener("click", function (ev) {
       ev.preventDefault();
       ev.stopPropagation();
       startBackup(p.id, refresh);
     });
-    wrap.appendChild(a);
-    wrap.appendChild(refresh);
-    wrap.appendChild(pick);
     const bars = document.createElement("div");
     bars.className = "cab-bars";
     bars.appendChild(hpRow("backup"));
     bars.appendChild(hpRow("tag"));
+    const actions = document.createElement("div");
+    actions.className = "cab-actions";
+    actions.appendChild(refresh);
+    actions.appendChild(pick);
+    const side = document.createElement("div");
+    side.className = "cab-side";
+    side.appendChild(bars);
+    side.appendChild(actions);
     hud.appendChild(wrap);
-    hud.appendChild(bars);
+    hud.appendChild(side);
     fillHud(hud, p);
     return hud;
   }
@@ -278,6 +293,8 @@
     });
     const refresh = hud.querySelector(".cab-refresh");
     if (refresh) refresh.classList.toggle("is-run", backupRun);
+    const cover = hud.querySelector(".cab-cover");
+    if (cover) cover.classList.toggle("is-run", backupRun);
   }
 
   function paintHp(row, view) {

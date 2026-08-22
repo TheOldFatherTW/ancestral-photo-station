@@ -218,30 +218,6 @@
         window.FamilyTags.showPhoto(slide.familyItem);
       }
     });
-    lightbox.on("imageClickAction", function (evt) {
-      evt.preventDefault();
-      const slide =
-        lightbox._slides &&
-        lightbox.pswp &&
-        lightbox._slides[lightbox.pswp.currIndex];
-      if (window.FamilyTags && slide && slide.familyItem) {
-        window.FamilyTags.togglePhoto(slide.familyItem);
-      }
-    });
-    lightbox.on("tapAction", function (evt) {
-      const orig = evt.originalEvent;
-      const target = orig && orig.target;
-      if (target && target.closest && target.closest("video, .pswp__button, .pswp-tag-sheet")) {
-        return;
-      }
-      const slide =
-        lightbox._slides &&
-        lightbox.pswp &&
-        lightbox._slides[lightbox.pswp.currIndex];
-      if (!slide || !slide.familyItem || slide.familyItem.kind === "video") return;
-      evt.preventDefault();
-      if (window.FamilyTags) window.FamilyTags.togglePhoto(slide.familyItem);
-    });
     lightbox.init();
     return lightbox;
   }

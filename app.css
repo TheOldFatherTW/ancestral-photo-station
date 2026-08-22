@@ -640,6 +640,13 @@ button, .btn {
   padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(180deg, rgba(20, 16, 18, 0) 0%, rgba(20, 16, 18, 0.82) 28%, rgba(20, 16, 18, 0.94) 100%);
   color: #fff;
+  pointer-events: none;
+}
+.pswp-tag-sheet > * {
+  pointer-events: auto;
+}
+.pswp-tag-sheet.is-video {
+  padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
 }
 .pswp-tag-sheet[hidden] {
   display: none !important;

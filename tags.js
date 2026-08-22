@@ -8,7 +8,6 @@
   let lastBoard = { groups: [], job: {} };
   let sheet = null;
   let sheetItem = null;
-  let sheetOpen = false;
 
   function api(path, opts) {
     const origin = (window.VAULT_ORIGIN || "").replace(/\/$/, "");
@@ -136,7 +135,7 @@
     node.innerHTML = "";
     const title = document.createElement("p");
     title.className = "pswp-tag-title";
-    title.textContent = "這張的標記";
+    title.textContent = sheetItem && sheetItem.kind === "video" ? "這支的標記" : "這張的標記";
     node.appendChild(title);
     const row = document.createElement("div");
     row.className = "pswp-tag-row";
@@ -216,19 +215,21 @@
 
   function loadPhoto(item) {
     sheetItem = item;
-    sheetOpen = true;
     const node = hostSheet();
     node.hidden = false;
+    node.classList.toggle("is-video", item.kind === "video");
     api("/api/tags?" + photoQuery(item))
       .then(function (res) {
         return res.json();
       })
-      .then(paintSheet)
+      .then(function (data) {
+        if (!sheetItem || sheetItem.rel !== item.rel || sheetItem.bucket !== item.bucket) return;
+        paintSheet(data);
+      })
       .catch(function () {});
   }
 
   function closePhoto() {
-    sheetOpen = false;
     sheetItem = null;
     if (sheet) sheet.hidden = true;
   }
@@ -240,17 +241,8 @@
       selected = [];
       load();
     },
-    togglePhoto: function (item) {
-      if (!item || !item.person) return;
-      if (sheetOpen && sheetItem && sheetItem.rel === item.rel && sheetItem.bucket === item.bucket) {
-        closePhoto();
-        return;
-      }
-      loadPhoto(item);
-    },
     showPhoto: function (item) {
       if (!item || !item.person) return;
-      if (!sheetOpen) return;
       loadPhoto(item);
     },
     closePhoto: closePhoto,

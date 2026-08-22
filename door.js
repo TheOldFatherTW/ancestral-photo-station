@@ -1,6 +1,7 @@
 (function () {
   const ORIGIN = (window.VAULT_ORIGIN || "").replace(/\/$/, "");
   const STALE_MS = 20 * 60 * 1000;
+  const NEED_LINK = "請用給你的專用連結打開";
   const DISCONNECTED = "目前無法連上,請聯絡維護的那個傢伙";
   const CHECK =
     '<span class="ios-check" aria-label="已同步"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#34c759"/><path fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M7.2 12.4l3.1 3.2 6.5-7.2"/></svg></span>';
@@ -19,7 +20,10 @@
     '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="8" width="17" height="11.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 8l1.4-2.4h5.2L16 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="13.6" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>';
 
   function api(path) {
-    return ORIGIN + path;
+    const url = ORIGIN + path;
+    const k = window.FAMILY_VIEW_KEY;
+    if (!k) return url;
+    return url + (path.indexOf("?") >= 0 ? "&" : "?") + "k=" + encodeURIComponent(k);
   }
 
   function lineFrom(data) {
@@ -40,6 +44,11 @@
     }, 6000);
     try {
       const res = await fetch(api(path), { cache: "no-store", signal: ctrl.signal });
+      if (res.status === 401 || res.status === 403) {
+        const err = new Error("need_key");
+        err.code = "need_key";
+        throw err;
+      }
       if (!res.ok) throw new Error("bad status");
       return await res.json();
     } finally {
@@ -260,6 +269,12 @@
       fail(DISCONNECTED);
       return;
     }
+    if (!window.FAMILY_VIEW_KEY) {
+      fail(NEED_LINK);
+      if (cabs) cabs.innerHTML = "";
+      lastCab = "";
+      return;
+    }
     try {
       const pub = await readJson("/api/public");
       if (statusEl) statusEl.textContent = lineFrom(pub);
@@ -278,18 +293,20 @@
       } else {
         paintBusy(cab.people);
       }
+      const back = document.querySelector("#album .back");
+      if (back) back.hidden = (cab.people || []).length < 2;
       window._familyRunning = (cab.people || []).some(function (p) {
         return p.sync === "running";
       });
     } catch (err) {
-      fail(DISCONNECTED);
+      fail(err && err.code === "need_key" ? NEED_LINK : DISCONNECTED);
     }
     route();
   }
 
   function route() {
     const id = personFromHash();
-    if (!id) {
+    if (!id || !names[id]) {
       showHome();
       return;
     }

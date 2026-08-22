@@ -9,7 +9,10 @@
   let paintHint = function () {};
 
   function api(path) {
-    return ORIGIN + path;
+    const url = ORIGIN + path;
+    const k = window.FAMILY_VIEW_KEY;
+    if (!k) return url;
+    return url + (path.indexOf("?") >= 0 ? "&" : "?") + "k=" + encodeURIComponent(k);
   }
 
   function pumpThumbs() {
@@ -275,14 +278,14 @@
         loading = true;
         showHint();
         try {
-          const url =
-            api("/api/photos") +
-            "?person=" +
-            encodeURIComponent(person) +
-            "&offset=" +
-            offset +
-            "&limit=" +
-            LIMIT;
+          const url = api(
+            "/api/photos?person=" +
+              encodeURIComponent(person) +
+              "&offset=" +
+              offset +
+              "&limit=" +
+              LIMIT
+          );
           const res = await fetch(url, { cache: "no-store" });
           const data = await res.json();
           if (my !== run) return;

@@ -2,7 +2,6 @@
   "id": "./",
   "name": "家族照片備份",
   "short_name": "家族備份",
-  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],

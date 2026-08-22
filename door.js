@@ -18,7 +18,9 @@
   let coverPerson = "";
   let uploadInput = null;
   let uploadPerson = "";
+  let uploadBtn = null;
   let uploadBusy = false;
+  let heldNote = "";
   const UPLOAD_CAP = 480 * 1024 * 1024;
   const BATCH_CAP = 40 * 1024 * 1024;
   let backupAsk = {};
@@ -133,6 +135,13 @@
     if (statusEl) statusEl.textContent = msg || DISCONNECTED;
   }
 
+  // The twelve second poll rewrites the status line, which silently ate every word an
+  // upload tried to say. Anything held here outranks the poll until the job lets go.
+  function hold(msg) {
+    heldNote = msg || "";
+    if (statusEl && heldNote) statusEl.textContent = heldNote;
+  }
+
   function pickCover(person) {
     coverPerson = person;
     if (!coverInput) {
@@ -178,8 +187,9 @@
 
   // A phone that will not sync to iCloud and will not talk to Windows over the cable can
   // still open this page, so hand-picking the stranded pictures is the last way in.
-  function pickUpload(person) {
+  function pickUpload(person, btn) {
     uploadPerson = person;
+    uploadBtn = btn || null;
     if (!uploadInput) {
       uploadInput = document.createElement("input");
       uploadInput.type = "file";
@@ -193,7 +203,14 @@
         const picked = Array.prototype.slice.call(uploadInput.files || []);
         const who = uploadPerson;
         uploadInput.value = "";
-        if (picked.length && who) sendUploads(who, picked);
+        if (!picked.length || !who) return;
+        // Say something before anything touches file.size: on iOS that is what forces
+        // the HEIC to JPEG conversion, and it can sit there for a minute saying nothing.
+        if (uploadBtn) uploadBtn.classList.add("is-run");
+        hold("讀取 " + picked.length + " 張照片…");
+        window.setTimeout(function () {
+          sendUploads(who, picked);
+        }, 50);
       });
     }
     uploadInput.value = "";
@@ -237,9 +254,9 @@
         failed += n;
       }
       sent += n;
-      fail("上傳中 " + sent + "/" + files.length + "…");
+      hold("上傳中 " + sent + "/" + files.length + "…");
     }
-    fail("上傳中 0/" + files.length + "…");
+    hold("上傳中 0/" + files.length + "…");
     try {
       for (const f of files) {
         if (f.size > UPLOAD_CAP) {
@@ -255,8 +272,8 @@
       const bits = [];
       if (saved) bits.push("收進來 " + saved + " 張");
       if (already) bits.push(already + " 張本來就有");
-      if (failed) bits.push(failed + " 張傳不上來");
-      fail(bits.length ? bits.join("，") : "沒有新的照片");
+      if (failed) bits.push(failed + " 張傳不上來，再試一次");
+      hold(bits.length ? bits.join("，") : "沒有新的照片");
       if (saved) {
         lastCab = "";
         await boot();
@@ -264,8 +281,17 @@
           window.FamilyFeed.refresh();
         }
       }
+    } catch (err) {
+      hold("上傳出錯了：" + (err && err.message ? err.message : "連不上家裡那台"));
     } finally {
       uploadBusy = false;
+      if (uploadBtn) uploadBtn.classList.remove("is-run");
+      // The outcome has to survive long enough to be read, but it must not become the
+      // permanent status line, so the poll gets its job back after a spell.
+      const said = heldNote;
+      window.setTimeout(function () {
+        if (heldNote === said) hold("");
+      }, 20000);
     }
   }
 
@@ -388,7 +414,7 @@
     send.addEventListener("click", function (ev) {
       ev.preventDefault();
       ev.stopPropagation();
-      pickUpload(p.id);
+      pickUpload(p.id, send);
     });
     const bars = document.createElement("div");
     bars.className = "cab-bars";
@@ -565,7 +591,7 @@
     }
     try {
       const pub = await readJson("/api/public");
-      if (statusEl) statusEl.textContent = lineFrom(pub);
+      if (statusEl && !heldNote) statusEl.textContent = lineFrom(pub);
       const cab = await readJson("/api/cabinets");
       names = {};
       (cab.people || []).forEach(function (p) {

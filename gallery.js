@@ -203,6 +203,9 @@
       });
       if (window.FamilyTags) window.FamilyTags.closePhoto();
     });
+    lightbox.on("contentActivate", function () {
+      if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
+    });
     lightbox.on("change", function () {
       if (!lightbox.pswp || !lightbox._slides) return;
       document.querySelectorAll(".pswp-video video").forEach(function (v) {

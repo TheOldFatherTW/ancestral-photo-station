@@ -747,6 +747,29 @@ button, .btn {
   padding: 8px 14px;
   border-radius: 999px;
 }
+.pswp-tag-rename {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.pswp-tag-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pswp-tag-suggest button {
+  margin: 0;
+  width: auto;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+}
 @media (max-width: 560px) {
   .credit { white-space: normal; }
   .local-cabs.solo .cab-hud {

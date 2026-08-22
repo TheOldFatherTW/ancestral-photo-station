@@ -43,6 +43,9 @@ body {
   overflow: hidden;
   color: transparent;
   text-decoration: none;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .tile:link,
 .tile:visited,
@@ -73,6 +76,53 @@ body {
   border-width: 7px 0 7px 12px;
   border-color: transparent transparent transparent #fff;
   filter: drop-shadow(0 1px 2px rgba(0,0,0,.45));
+}
+.tile.is-pick::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(214, 41, 118, 0.28);
+  z-index: 1;
+  pointer-events: none;
+}
+.tile.is-pick::after {
+  content: "";
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #d62976 url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round' d='M6.5 12.5l3.2 3.3 8-8.4'/></svg>") center / 16px 16px no-repeat;
+  box-shadow: 0 0 0 2px #fff;
+  z-index: 2;
+}
+.tile.is-video.is-pick::after {
+  border: 0;
+  width: 22px;
+  height: 22px;
+  right: 8px;
+  bottom: 8px;
+  top: auto;
+  filter: none;
+}
+.trash-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 8px;
+  padding: 8px 4px;
+  color: var(--mute);
+  font-size: 13px;
+}
+.trash-bar button {
+  margin: 0;
+  width: auto;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 999px;
 }
 .feed-empty {
   grid-column: 1 / -1;
@@ -361,6 +411,23 @@ a.cab {
 .ins-icon.is-run .ins-ring {
   animation: ins-spin 2.4s linear infinite;
 }
+.ins-icon.is-cast .ins-ring {
+  animation: none;
+  background: conic-gradient(
+    from -90deg,
+    #d62976 0deg,
+    #d62976 var(--cast, 0deg),
+    rgba(0, 0, 0, 0.12) var(--cast, 0deg)
+  );
+}
+.cab-trash,
+.album-trash,
+.pswp-trash {
+  touch-action: none;
+}
+.ins-icon[hidden] {
+  display: none !important;
+}
 .ins-face {
   position: absolute;
   inset: 3px;
@@ -462,6 +529,12 @@ a.cab {
   gap: 12px;
 }
 .album-head h2 { margin: 0; }
+.album-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
 .cover-change {
   width: 36px;
   height: 36px;
@@ -640,6 +713,16 @@ button, .btn {
 .pswp-face-layer.is-off {
   display: none !important;
 }
+.pswp-trash {
+  position: absolute;
+  top: 64px;
+  right: 16px;
+  z-index: 21;
+  color: #111;
+}
+.pswp-trash[hidden] {
+  display: none !important;
+}
 .pswp-face-cube {
   position: absolute;
   top: 64px;
@@ -704,6 +787,9 @@ button, .btn {
   border: 2px solid rgba(255, 255, 255, 0.95);
   box-shadow: 0 0 0 1px rgba(214, 41, 118, 0.85);
   border-radius: 10px;
+  pointer-events: auto;
+  cursor: pointer;
+  overflow: visible;
 }
 .pswp-face.is-on {
   border-color: #d62976;
@@ -729,6 +815,42 @@ button, .btn {
 .pswp-tag-sheet .tag-chip.is-on {
   background: linear-gradient(120deg, #fa7e1e 0%, #d62976 48%, #962fbf 100%);
   border-color: transparent;
+}
+.tag-chip-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.pswp-tag-sheet .tag-chip-wrap .tag-chip,
+.tag-chip-wrap .tag-chip {
+  margin: 0;
+}
+.ins-x {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  z-index: 2;
+  margin: 0;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid #fff;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 14px;
+  line-height: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ins-x[hidden] {
+  display: none !important;
+}
+.pswp-face > .ins-x {
+  top: -8px;
+  right: -8px;
 }
 .pswp-tag-sheet {
   position: absolute;

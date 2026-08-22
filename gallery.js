@@ -4,12 +4,18 @@
   const LIMIT = 24;
   const THUMB_FAST = 8;
   const THUMB_SLOW = 3;
+  const SELECT_MAX = 99;
   let run = 0;
   let lightbox;
   let thumbActive = 0;
   let thumbSlots = THUMB_FAST;
   const thumbWait = [];
   let paintHint = function () {};
+  let currentPerson = "";
+  let currentTags = [];
+  let trashMode = false;
+  let selecting = false;
+  let picked = {};
 
   function api(path) {
     const url = ORIGIN + path;
@@ -67,6 +73,89 @@
     });
     if (kind === "thumb" && size) p.set("size", size);
     return api((kind === "thumb" ? "/thumb?" : "/media?") + p.toString());
+  }
+
+  function itemKey(item) {
+    return item.person + "|" + item.bucket + "|" + item.rel;
+  }
+
+  function pickCount() {
+    return Object.keys(picked).length;
+  }
+
+  function tellSelect() {
+    if (window.FamilyDoor && window.FamilyDoor.setSelect) {
+      window.FamilyDoor.setSelect(selecting ? pickCount() : 0, trashMode);
+    }
+  }
+
+  function markTile(a, on) {
+    if (!a) return;
+    a.classList.toggle("is-pick", !!on);
+  }
+
+  function paintPicked() {
+    const feed = document.getElementById("feed");
+    if (!feed) return;
+    feed.querySelectorAll("a.tile").forEach(function (a) {
+      markTile(a, selecting && picked[a.dataset.key]);
+    });
+    tellSelect();
+  }
+
+  function enterSelect(item, tile) {
+    selecting = true;
+    if (item) {
+      const key = itemKey(item);
+      if (!picked[key] && pickCount() >= SELECT_MAX) return;
+      picked[key] = item;
+      markTile(tile, true);
+    }
+    tellSelect();
+  }
+
+  function toggleSelect(item, tile) {
+    if (!selecting) {
+      enterSelect(item, tile);
+      return;
+    }
+    const key = itemKey(item);
+    if (picked[key]) {
+      delete picked[key];
+      markTile(tile, false);
+      if (!pickCount()) {
+        selecting = false;
+      }
+    } else {
+      if (pickCount() >= SELECT_MAX) return;
+      picked[key] = item;
+      markTile(tile, true);
+    }
+    tellSelect();
+  }
+
+  function clearSelect() {
+    selecting = false;
+    picked = {};
+    paintPicked();
+  }
+
+  function tagPost(body) {
+    if (window.FamilyTags && window.FamilyTags.act) return window.FamilyTags.act(body);
+    return fetch(api("/api/tags"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then(function (res) {
+      return res.json();
+    });
+  }
+
+  function pickedRows() {
+    return Object.keys(picked).map(function (key) {
+      const item = picked[key];
+      return { person: item.person, bucket: item.bucket, rel: item.rel };
+    });
   }
 
   function monthLabel(group) {
@@ -232,7 +321,7 @@
   }
 
   window.FamilyFeed = {
-    start: function (person, tagIds) {
+    start: function (person, tagIds, opts) {
       const feed = document.getElementById("feed");
       const sentinel = document.getElementById("feed-sentinel");
       const hint = document.getElementById("feed-hint");
@@ -247,6 +336,27 @@
       feed.innerHTML = "";
       feed.dataset.person = person;
       feed.dataset.tags = (tagIds || []).join(",");
+      currentPerson = person;
+      currentTags = tagIds || [];
+      trashMode = !!(opts && opts.trash);
+      feed.dataset.trash = trashMode ? "1" : "";
+      feed.classList.toggle("is-trash", trashMode);
+      if (!opts || !opts.keepSelect) clearSelect();
+      if (trashMode) {
+        const bar = document.createElement("p");
+        bar.className = "trash-bar";
+        const note = document.createElement("span");
+        note.textContent = "垃圾桶 · 點進照片，刪掉 #delete 即可救回";
+        const back = document.createElement("button");
+        back.type = "button";
+        back.textContent = "返回相簿";
+        back.addEventListener("click", function () {
+          window.FamilyFeed.closeTrash();
+        });
+        bar.appendChild(note);
+        bar.appendChild(back);
+        feed.appendChild(bar);
+      }
 
       function showHint() {
         if (!hint || my !== run) return;
@@ -269,6 +379,7 @@
         const a = document.createElement("a");
         a.className = "tile" + (item.kind === "video" ? " is-video" : "");
         a.href = item.kind === "video" ? qs(item, "media") : qs(item, "thumb", "tile");
+        a.dataset.key = itemKey(item);
         const img = document.createElement("img");
         img.decoding = "async";
         img.alt = "";
@@ -288,8 +399,48 @@
           }
         });
         a.appendChild(img);
+        markTile(a, selecting && picked[a.dataset.key]);
+        let press = 0;
+        let sx = 0;
+        let sy = 0;
+        let fromHold = false;
+        function clearPress() {
+          if (press) {
+            window.clearTimeout(press);
+            press = 0;
+          }
+        }
+        a.addEventListener("pointerdown", function (ev) {
+          if (ev.button && ev.button !== 0) return;
+          sx = ev.clientX;
+          sy = ev.clientY;
+          fromHold = false;
+          clearPress();
+          press = window.setTimeout(function () {
+            press = 0;
+            fromHold = true;
+            enterSelect(item, a);
+          }, 480);
+        });
+        a.addEventListener("pointermove", function (ev) {
+          if (!press) return;
+          if (Math.abs(ev.clientX - sx) > 14 || Math.abs(ev.clientY - sy) > 14) clearPress();
+        });
+        a.addEventListener("pointerup", clearPress);
+        a.addEventListener("pointercancel", clearPress);
+        a.addEventListener("contextmenu", function (ev) {
+          ev.preventDefault();
+        });
         a.addEventListener("click", function (ev) {
           ev.preventDefault();
+          if (fromHold) {
+            fromHold = false;
+            return;
+          }
+          if (selecting) {
+            toggleSelect(item, a);
+            return;
+          }
           if (!lb) return;
           lb._slides = slides;
           lb.loadAndOpen(index);
@@ -321,6 +472,7 @@
             "&limit=" +
             (offset ? LIMIT : FIRST);
           if (tags.length) path += "&tags=" + tags.map(encodeURIComponent).join(",");
+          if (trashMode) path += "&trash=1";
           const url = api(path);
           const res = await fetch(url);
           const data = await res.json();
@@ -343,7 +495,13 @@
           offset += got;
           if (offset >= FIRST) thumbSlots = THUMB_SLOW;
           if (!offset) {
-            feed.innerHTML = '<p class="feed-empty">這個櫃子還沒有照片。</p>';
+            const empty = document.createElement("p");
+            empty.className = "feed-empty";
+            empty.textContent = trashMode
+              ? "垃圾桶是空的。"
+              : "這個櫃子還沒有照片。";
+            if (!trashMode) feed.innerHTML = "";
+            feed.appendChild(empty);
           }
         } catch (err) {
           if (my !== run) return;
@@ -381,9 +539,57 @@
       const person = (document.getElementById("feed") || {}).dataset.person;
       if (person) window.FamilyFeed.start(person, tagIds || []);
     },
+    refresh: function () {
+      if (!currentPerson) return;
+      if (lightbox && lightbox.pswp) lightbox.pswp.close();
+      window.FamilyFeed.start(currentPerson, currentTags, { trash: trashMode });
+    },
+    trashSelected: function () {
+      const rows = pickedRows();
+      if (!rows.length) return Promise.resolve();
+      if (!window.confirm("把選取的 " + rows.length + " 張丟進垃圾桶？三天內可救回。")) {
+        return Promise.resolve();
+      }
+      return tagPost({
+        action: "trash",
+        person: currentPerson,
+        photos: rows,
+      }).then(function () {
+        clearSelect();
+        window.FamilyFeed.start(currentPerson, currentTags, { trash: trashMode });
+      });
+    },
+    tagSelected: function (label) {
+      const rows = pickedRows();
+      const name = String(label || "").trim().replace(/^#/, "");
+      if (!rows.length || !name) return Promise.resolve();
+      return tagPost({
+        action: "attach_many",
+        person: currentPerson,
+        kind: "custom",
+        label: name,
+        photos: rows,
+      }).then(function () {
+        clearSelect();
+        window.FamilyFeed.start(currentPerson, currentTags, { trash: trashMode });
+      });
+    },
+    openTrash: function () {
+      if (!currentPerson) return;
+      if (lightbox && lightbox.pswp) lightbox.pswp.close();
+      clearSelect();
+      window.FamilyFeed.start(currentPerson, [], { trash: true });
+    },
+    closeTrash: function () {
+      if (!currentPerson) return;
+      window.FamilyFeed.start(currentPerson, []);
+    },
     stop: function () {
       run += 1;
       paintHint = function () {};
+      currentPerson = "";
+      trashMode = false;
+      clearSelect();
       if (window.feedObserver) window.feedObserver.disconnect();
       const sentinel = document.getElementById("feed-sentinel");
       const hint = document.getElementById("feed-hint");

@@ -20,6 +20,10 @@
     '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="8" width="17" height="11.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 8l1.4-2.4h5.2L16 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="13.6" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>';
   const REFRESH =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M20 4.5V9h-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const TRASH =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8V6.8A1.8 1.8 0 0 1 9.8 5h4.4A1.8 1.8 0 0 1 16 6.8V8M5 8h14M9 11v7M12 11v7M15 11v7M7 8l.8 12.2A1.6 1.6 0 0 0 9.4 22h5.2a1.6 1.6 0 0 0 1.6-1.8L17 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const HASH =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4l-1.2 16M15.2 4l-1.2 16M4.5 9h15M4 15h15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 
   function api(path) {
     const url = ORIGIN + path;
@@ -176,6 +180,60 @@
     return btn;
   }
 
+  function bindCastTrash(btn) {
+    let hold = 0;
+    let raf = 0;
+    let start = 0;
+    let opened = false;
+    function stopCast() {
+      if (hold) {
+        window.clearTimeout(hold);
+        hold = 0;
+      }
+      if (raf) {
+        window.cancelAnimationFrame(raf);
+        raf = 0;
+      }
+      btn.classList.remove("is-cast");
+      btn.style.removeProperty("--cast");
+    }
+    function tick() {
+      const t = Math.min(1, (Date.now() - start) / 2000);
+      btn.style.setProperty("--cast", 360 * t + "deg");
+      if (t < 1 && hold) raf = window.requestAnimationFrame(tick);
+    }
+    btn.addEventListener("pointerdown", function (ev) {
+      if (ev.button && ev.button !== 0) return;
+      ev.preventDefault();
+      opened = false;
+      stopCast();
+      btn.classList.add("is-cast");
+      start = Date.now();
+      raf = window.requestAnimationFrame(tick);
+      try {
+        btn.setPointerCapture(ev.pointerId);
+      } catch (e) {}
+      hold = window.setTimeout(function () {
+        hold = 0;
+        opened = true;
+        stopCast();
+        if (window.FamilyFeed) window.FamilyFeed.openTrash();
+      }, 2000);
+    });
+    function endCast() {
+      if (opened) return;
+      const held = Date.now() - start;
+      stopCast();
+      if (held >= 2000) return;
+      if (held < 450 && window.FamilyFeed) window.FamilyFeed.trashSelected();
+    }
+    btn.addEventListener("pointerup", endCast);
+    btn.addEventListener("pointercancel", function () {
+      opened = false;
+      stopCast();
+    });
+  }
+
   function cabCard(p) {
     const hud = document.createElement("div");
     hud.className = "cab-hud";
@@ -215,6 +273,18 @@
       ev.stopPropagation();
       pickCover(p.id);
     });
+    const trash = insButton("cab-trash", TRASH, "丟進垃圾桶");
+    trash.hidden = true;
+    bindCastTrash(trash);
+    const hash = insButton("cab-hash", HASH, "新增多張標記");
+    hash.hidden = true;
+    hash.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const label = window.prompt("要加到選取照片的標記名稱");
+      if (!label || !window.FamilyFeed) return;
+      window.FamilyFeed.tagSelected(label);
+    });
     const refresh = insButton("cab-refresh", REFRESH, "檢查並備份");
     refresh.addEventListener("click", function (ev) {
       ev.preventDefault();
@@ -229,6 +299,8 @@
     actions.className = "cab-actions";
     actions.appendChild(refresh);
     actions.appendChild(pick);
+    actions.appendChild(trash);
+    actions.appendChild(hash);
     const side = document.createElement("div");
     side.className = "cab-side";
     side.appendChild(bars);
@@ -429,6 +501,59 @@
       if (person) pickCover(person);
     });
   }
+  (function albumTools() {
+    const head = document.querySelector(".album-head");
+    if (!head) return;
+    let tools = document.getElementById("album-tools");
+    if (!tools) {
+      tools = document.createElement("div");
+      tools.id = "album-tools";
+      tools.className = "album-tools";
+      if (albumCoverBtn && albumCoverBtn.parentNode === head) {
+        head.appendChild(tools);
+        tools.appendChild(albumCoverBtn);
+      } else {
+        head.appendChild(tools);
+      }
+    }
+    if (!document.getElementById("album-trash-btn")) {
+      const trash = insButton("album-trash", TRASH, "丟進垃圾桶");
+      trash.id = "album-trash-btn";
+      trash.hidden = true;
+      bindCastTrash(trash);
+      const hash = insButton("album-hash", HASH, "新增多張標記");
+      hash.id = "album-hash-btn";
+      hash.hidden = true;
+      hash.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const label = window.prompt("要加到選取照片的標記名稱");
+        if (!label || !window.FamilyFeed) return;
+        window.FamilyFeed.tagSelected(label);
+      });
+      tools.appendChild(trash);
+      tools.appendChild(hash);
+    }
+  })();
+  window.FamilyDoor = {
+    setSelect: function (count, inTrash) {
+      const n = Number(count) || 0;
+      const show = n > 0;
+      document.querySelectorAll(".cab-trash, .cab-hash, .album-trash, .album-hash").forEach(function (el) {
+        el.hidden = !show;
+      });
+      if (statusEl) {
+        if (inTrash) statusEl.textContent = "正在看垃圾桶";
+        else if (show) statusEl.textContent = "已選 " + n + " / 99";
+        else if (
+          statusEl.textContent.indexOf("已選") === 0 ||
+          statusEl.textContent === "正在看垃圾桶"
+        ) {
+          statusEl.textContent = "";
+        }
+      }
+    },
+  };
   window.addEventListener("hashchange", route);
   boot();
   (function poll() {

@@ -158,6 +158,43 @@
     });
   }
 
+  function displayBox(nw, nh) {
+    nw = Number(nw) || 0;
+    nh = Number(nh) || 0;
+    if (nw < 8 || nh < 8) {
+      nw = 1600;
+      nh = 1067;
+    }
+    const need = Math.max(window.innerWidth || 0, window.innerHeight || 0);
+    const edge = Math.max(nw, nh);
+    if (need && edge < need) {
+      const k = need / edge;
+      return { w: Math.round(nw * k), h: Math.round(nh * k) };
+    }
+    return { w: nw, h: nh };
+  }
+
+  function applySlideSize(content, nw, nh) {
+    const box = displayBox(nw, nh);
+    if (!content) return;
+    content.width = box.w;
+    content.height = box.h;
+    if (content.data) {
+      content.data.width = box.w;
+      content.data.height = box.h;
+    }
+    const slide = content.slide;
+    if (!slide) return;
+    slide.width = box.w;
+    slide.height = box.h;
+    if (typeof slide.updateContentSize === "function") {
+      slide.updateContentSize(true);
+    }
+    if (slide.pswp && typeof slide.pswp.updateSize === "function") {
+      slide.pswp.updateSize(true);
+    }
+  }
+
   function monthLabel(group) {
     const m = /^(\d{4})-(\d{2})$/.exec(group || "");
     if (!m) return group || "";
@@ -165,10 +202,8 @@
   }
 
   function slideFor(item, tile) {
-    const tileUrl = qs(item, "thumb");
-    const img = tile && tile.querySelector("img");
-    const w = (img && img.naturalWidth) || 1600;
-    const h = (img && img.naturalHeight) || 1067;
+    const tileUrl = qs(item, "thumb", "tile");
+    const box = displayBox(1600, 1067);
     if (item.kind === "video") {
       const src = qs(item, "media");
       return {
@@ -179,17 +214,17 @@
           src.replace(/"/g, "") +
           '"></video><p class="vid-wait" hidden>影片準備中…</p></div>',
         msrc: tileUrl,
-        width: w,
-        height: h,
+        width: box.w,
+        height: box.h,
         element: tile,
         familyItem: item,
       };
     }
     return {
-      src: qs(item, "thumb"),
+      src: qs(item, "media"),
       msrc: tileUrl,
-      width: w,
-      height: h,
+      width: box.w,
+      height: box.h,
       alt: item.who,
       element: tile,
       thumbCropped: true,
@@ -260,17 +295,12 @@
       }
       if (video) {
         bindVideoWait(video);
-        const data = evt.content.data;
-        const img = data && data.element && data.element.querySelector("img");
-        const tw = img && img.naturalWidth;
-        const th = img && img.naturalHeight;
-        if (tw && th) {
-          evt.content.width = tw;
-          evt.content.height = th;
-          data.width = tw;
-          data.height = th;
-          if (evt.content.slide) evt.content.slide.updateContentSize(true);
+        const content = evt.content;
+        function sizeVid() {
+          if (video.videoWidth) applySlideSize(content, video.videoWidth, video.videoHeight);
         }
+        if (video.videoWidth) sizeVid();
+        else video.addEventListener("loadedmetadata", sizeVid, { once: true });
       }
     });
     lightbox.on("contentDeactivate", function (evt) {
@@ -286,6 +316,11 @@
         video.src = video.getAttribute("data-src");
         video.load();
       }
+    });
+    lightbox.on("loadComplete", function (evt) {
+      const el = evt.content && evt.content.element;
+      if (el && el.naturalWidth) applySlideSize(evt.content, el.naturalWidth, el.naturalHeight);
+      if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
     });
     lightbox.on("close", function () {
       document.querySelectorAll(".pswp-video video").forEach(function (v) {
@@ -316,6 +351,11 @@
           if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
         });
         lightbox.pswp.on("zoomPanUpdate", function () {
+          if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
+        });
+        lightbox.pswp.on("loadComplete", function (evt) {
+          const el = evt.content && evt.content.element;
+          if (el && el.naturalWidth) applySlideSize(evt.content, el.naturalWidth, el.naturalHeight);
           if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
         });
       }
@@ -391,18 +431,6 @@
         img.draggable = false;
         bindThumb(img, qs(item, "thumb", "tile"), function () {
           img.classList.add("is-on");
-          const slide = slides[index];
-          if (slide && img.naturalWidth && img.naturalHeight) {
-            slide.width = img.naturalWidth;
-            slide.height = img.naturalHeight;
-            const pswp = lb && lb.pswp;
-            if (pswp && pswp.currSlide && pswp.currSlide.data === slide) {
-              pswp.currSlide.content.width = img.naturalWidth;
-              pswp.currSlide.content.height = img.naturalHeight;
-              pswp.currSlide.updateContentSize(true);
-              pswp.updateSize(true);
-            }
-          }
         });
         a.appendChild(img);
         markTile(a, selecting && picked[a.dataset.key]);

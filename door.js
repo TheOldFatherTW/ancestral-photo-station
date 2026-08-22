@@ -16,6 +16,7 @@
   let lastCab = "";
   let coverInput = null;
   let coverPerson = "";
+  let backupAsk = {};
   const CAMERA =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="8" width="17" height="11.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 8l1.4-2.4h5.2L16 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="13.6" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>';
   const REFRESH =
@@ -342,15 +343,27 @@
   }
 
   function fillHud(hud, p) {
+    const id = p.id;
     const backupRun = p.sync === "running";
-    const backupDone = !backupRun && (p.sync === "synced" || p.percent === 100);
+    if (!backupRun) backupAsk[id] = false;
+    if (!backupRun && (p.sync === "synced" || p.percent === 100)) {
+      try {
+        localStorage.setItem("family.backupDone." + id, "1");
+      } catch (e) {}
+    }
+    let remembered = false;
+    try {
+      remembered = localStorage.getItem("family.backupDone." + id) === "1";
+    } catch (e) {}
+    const showRun = backupRun && backupAsk[id];
+    const backupDone = !showRun && (remembered || p.sync === "synced" || p.percent === 100);
     paintHp(hud.querySelector('.hp[data-kind="backup"]'), {
-      running: backupRun,
+      running: showRun,
       done: backupDone,
       percent: p.percent,
       busyText: "自動備份中…",
       doneText: "備份完成",
-      waitText: "尚未同步",
+      waitText: "尚未檢查",
     });
     const job = p.tag || {};
     const tagRun = job.state === "running";
@@ -364,9 +377,9 @@
       waitText: "自動標記中…",
     });
     const refresh = hud.querySelector(".cab-refresh");
-    if (refresh) refresh.classList.toggle("is-run", backupRun);
+    if (refresh) refresh.classList.toggle("is-run", showRun);
     const cover = hud.querySelector(".cab-cover");
-    if (cover) cover.classList.toggle("is-run", backupRun);
+    if (cover) cover.classList.toggle("is-run", showRun);
   }
 
   function paintHp(row, view) {
@@ -404,6 +417,10 @@
   }
 
   function startBackup(person, btn) {
+    backupAsk[person] = true;
+    try {
+      localStorage.removeItem("family.backupDone." + person);
+    } catch (e) {}
     if (btn) btn.classList.add("is-run");
     fetch(api("/api/sync?person=" + encodeURIComponent(person)), { method: "POST" })
       .then(function (res) {

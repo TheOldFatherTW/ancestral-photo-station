@@ -286,7 +286,7 @@
               "&limit=" +
               LIMIT
           );
-          const res = await fetch(url, { cache: "no-store" });
+          const res = await fetch(url);
           const data = await res.json();
           if (my !== run) return;
           total = data.total;

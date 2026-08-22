@@ -43,7 +43,7 @@
       ctrl.abort();
     }, 6000);
     try {
-      const res = await fetch(api(path), { cache: "no-store", signal: ctrl.signal });
+      const res = await fetch(api(path), { signal: ctrl.signal });
       if (res.status === 401 || res.status === 403) {
         const err = new Error("need_key");
         err.code = "need_key";

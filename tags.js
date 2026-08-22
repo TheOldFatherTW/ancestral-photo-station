@@ -236,6 +236,10 @@
 
   window.FamilyTags = {
     show: function (who) {
+      if (person === who) {
+        load();
+        return;
+      }
       person = who;
       mode = "basic";
       selected = [];

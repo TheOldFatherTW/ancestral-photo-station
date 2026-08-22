@@ -208,7 +208,30 @@
     return node;
   }
 
-  function paintSheet(data) {
+  function afterChange(payload) {
+    paintSheet(payload);
+    // The write already answers with the whole board, so fetching it again
+    // only doubled the wait after every tap.
+    if (payload && payload.groups) paint(payload);
+    else load();
+  }
+
+  function runChange(body, working, said) {
+    window.FamilyBusy.start(working);
+    return photoPost(body).then(
+      function (payload) {
+        window.FamilyBusy.done(said);
+        afterChange(payload);
+        return payload;
+      },
+      function () {
+        window.FamilyBusy.done("沒有存到，請再試一次");
+        return null;
+      }
+    );
+  }
+
+  function paintSheet(data, keepFaces) {
     if (data && data.groups) lastBoard.groups = data.groups;
     const node = hostSheet();
     node.innerHTML = "";
@@ -225,6 +248,7 @@
     });
     if (!tags.length) {
       const empty = document.createElement("span");
+      empty.className = "pswp-tag-empty";
       empty.textContent = "還沒有標記";
       empty.style.opacity = "0.7";
       empty.style.fontSize = "13px";
@@ -244,9 +268,19 @@
     const suggest = document.createElement("div");
     suggest.className = "pswp-tag-suggest";
 
-    function afterChange(payload) {
-      paintSheet(payload);
-      load();
+    function ghostChip(label) {
+      const empty = row.querySelector(".pswp-tag-empty");
+      if (empty) empty.remove();
+      const wrap = document.createElement("span");
+      wrap.className = "tag-chip-wrap is-ghost";
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "tag-chip";
+      chip.textContent = "#" + label;
+      wrap.appendChild(chip);
+      row.appendChild(wrap);
+      input.value = "";
+      renderSuggest();
     }
 
     function askMerge(src, dst) {
@@ -254,7 +288,11 @@
         "要把「" + src.label + "」合併進「" + dst.label + "」嗎？全相簿一起改。"
       );
       if (!ok) return;
-      photoPost({ action: "merge", id: src.id, into: dst.id }).then(afterChange);
+      runChange(
+        { action: "merge", id: src.id, into: dst.id },
+        "正在把 #" + src.label + " 併進 #" + dst.label + "…",
+        "已併進 #" + dst.label
+      );
     }
 
     function askDeleteTag(tag) {
@@ -262,17 +300,24 @@
       if (tag.id === DELETE_ID) {
         const ok = window.confirm("把這張從垃圾桶救回來？");
         if (!ok) return;
-        photoPost({ action: "detach", id: DELETE_ID }).then(function (payload) {
-          afterChange(payload);
-          if (window.FamilyFeed && window.FamilyFeed.refresh) window.FamilyFeed.refresh();
-        });
+        runChange({ action: "detach", id: DELETE_ID }, "正在救回…", "已救回").then(
+          function (payload) {
+            if (payload && window.FamilyFeed && window.FamilyFeed.refresh) {
+              window.FamilyFeed.refresh();
+            }
+          }
+        );
         return;
       }
       const ok = window.confirm(
         "刪除「#" + tag.label + "」？所有照片上的這個標記都會消失。"
       );
       if (!ok) return;
-      photoPost({ action: "delete", id: tag.id }).then(afterChange);
+      runChange(
+        { action: "delete", id: tag.id },
+        "正在刪除 #" + tag.label + "…",
+        "已刪除 #" + tag.label
+      );
     }
 
     function showChipX() {
@@ -302,8 +347,16 @@
         pick.type = "button";
         pick.textContent = "#" + hit.label;
         pick.addEventListener("click", function () {
-          if (renaming) askMerge(renaming, hit);
-          else photoPost({ action: "attach", id: hit.id }).then(afterChange);
+          if (renaming) {
+            askMerge(renaming, hit);
+            return;
+          }
+          ghostChip(hit.label);
+          runChange(
+            { action: "attach", id: hit.id },
+            "正在加上 #" + hit.label + "…",
+            "已加上 #" + hit.label
+          );
         });
         suggest.appendChild(pick);
       });
@@ -377,6 +430,7 @@
       const label = (input.value || "").trim();
       if (!label) return;
       if (renaming) {
+        const was = renaming.label;
         const exact = matches().filter(function (hit) {
           return String(hit.label) === label;
         });
@@ -384,17 +438,30 @@
           askMerge(renaming, exact[0]);
           return;
         }
-        photoPost({ action: "rename", id: renaming.id, label: label }).then(afterChange);
+        runChange(
+          { action: "rename", id: renaming.id, label: label },
+          "正在把 #" + was + " 改成 #" + label + "…",
+          "已改成 #" + label
+        );
         return;
       }
       const exact = matches().filter(function (hit) {
         return String(hit.label) === label;
       });
+      ghostChip(label);
       if (exact.length === 1) {
-        photoPost({ action: "attach", id: exact[0].id }).then(afterChange);
+        runChange(
+          { action: "attach", id: exact[0].id },
+          "正在加上 #" + label + "…",
+          "已加上 #" + label
+        );
         return;
       }
-      photoPost({ action: "create_on_photo", kind: "custom", label: label }).then(afterChange);
+      runChange(
+        { action: "create_on_photo", kind: "custom", label: label },
+        "正在新增 #" + label + "…",
+        "已新增 #" + label
+      );
     });
     input.addEventListener("input", renderSuggest);
     input.addEventListener("keydown", function (ev) {
@@ -407,7 +474,10 @@
     form.appendChild(go);
     node.appendChild(form);
     node.appendChild(suggest);
-    paintFaces((data && data.photo && data.photo.faces) || []);
+    const shipped = (data && data.photo && data.photo.faces) || [];
+    // The tag sheet and the face boxes are fetched side by side, so whichever
+    // lands second must not wipe out boxes the other one already drew.
+    if (!keepFaces || shipped.length) paintFaces(shipped);
   }
 
   function currentPswp() {
@@ -520,10 +590,11 @@
           "刪除「#" + (face.label || "") + "」？所有照片上的這個標記都會消失。"
         );
         if (!ok) return;
-        photoPost({ action: "delete", id: face.id }).then(function (payload) {
-          paintSheet(payload);
-          load();
-        });
+        runChange(
+          { action: "delete", id: face.id },
+          "正在刪除 #" + (face.label || "") + "…",
+          "已刪除 #" + (face.label || "")
+        );
       });
       box.addEventListener("click", function (ev) {
         ev.preventDefault();
@@ -628,6 +699,10 @@
     );
   }
 
+  function stillOn(item) {
+    return !!sheetItem && sheetItem.rel === item.rel && sheetItem.bucket === item.bucket;
+  }
+
   function loadPhoto(item) {
     sheetItem = item;
     faceTick += 1;
@@ -640,21 +715,27 @@
     if (faceCtrl) faceCtrl.abort();
     faceCtrl = new AbortController();
     const ac = faceCtrl;
-    api("/api/tags?" + photoQuery(item))
+    const query = photoQuery(item);
+    let drewFaces = false;
+    // Both answers are wanted straight away. Holding the face request until the
+    // tag sheet came back is what left the cubes trailing the photo.
+    api("/api/tags?" + query, { signal: ac.signal })
       .then(function (res) {
         return res.json();
       })
       .then(function (data) {
-        if (!sheetItem || sheetItem.rel !== item.rel || sheetItem.bucket !== item.bucket) return;
-        paintSheet(data);
-        if (item.kind === "video") return;
-        return api("/api/faces?" + photoQuery(item), { signal: ac.signal }).then(function (res) {
-          return res.json();
-        });
+        if (stillOn(item)) paintSheet(data, drewFaces);
       })
-      .then(function (faceData) {
-        if (!faceData || !sheetItem || sheetItem.rel !== item.rel || sheetItem.bucket !== item.bucket) return;
-        if (faceData.faces) paintFaces(faceData.faces);
+      .catch(function () {});
+    if (item.kind === "video") return;
+    api("/api/faces?" + query, { signal: ac.signal })
+      .then(function (res) {
+        return res.json();
+      })
+      .then(function (data) {
+        if (!data || !data.faces || !stillOn(item)) return;
+        drewFaces = true;
+        paintFaces(data.faces);
       })
       .catch(function () {});
   }
@@ -666,6 +747,31 @@
     if (faceCube) faceCube.hidden = true;
     clearFaces();
   }
+
+  // iOS does not shrink the layout viewport for the on-screen keyboard, so a sheet
+  // pinned to bottom:0 ends up underneath it. visualViewport is the only thing that
+  // knows how much of the window the keyboard is actually covering.
+  (function watchKeyboard() {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    function sync() {
+      const lift = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      const up = lift > 80;
+      document.documentElement.style.setProperty("--kb", Math.round(lift) + "px");
+      document.documentElement.classList.toggle("kb-up", up);
+      if (up && sheet) {
+        window.requestAnimationFrame(function () {
+          const focused = document.activeElement;
+          if (focused && sheet.contains(focused) && focused.scrollIntoView) {
+            focused.scrollIntoView({ block: "nearest" });
+          }
+        });
+      }
+    }
+    vv.addEventListener("resize", sync);
+    vv.addEventListener("scroll", sync);
+    sync();
+  })();
 
   window.FamilyTags = {
     show: function (who) {

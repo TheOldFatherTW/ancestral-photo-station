@@ -78,6 +78,7 @@
       rel: item.rel,
     });
     if (kind === "thumb" && size) p.set("size", size);
+    if (kind === "full") p.set("full", "1");
     return api((kind === "thumb" ? "/thumb?" : "/media?") + p.toString());
   }
 
@@ -189,6 +190,59 @@
     if (el) el.textContent = msg || "";
   }
 
+  let busyDepth = 0;
+  let busyClear = 0;
+
+  function busyNode() {
+    let node = document.getElementById("work-note");
+    if (node) return node;
+    node = document.createElement("div");
+    node.id = "work-note";
+    node.className = "work-note";
+    node.hidden = true;
+    const spin = document.createElement("span");
+    spin.className = "work-spin";
+    const text = document.createElement("span");
+    text.className = "work-text";
+    node.appendChild(spin);
+    node.appendChild(text);
+    document.body.appendChild(node);
+    return node;
+  }
+
+  function paintBusy(msg, spinning) {
+    const node = busyNode();
+    node.querySelector(".work-text").textContent = msg || "";
+    node.classList.toggle("is-done", !spinning);
+    node.hidden = !msg;
+  }
+
+  // Every change tells the family it is being handled the moment they tap, so no
+  // button ever looks like it did nothing while the vault writes.
+  window.FamilyBusy = {
+    start: function (msg) {
+      busyDepth += 1;
+      if (busyClear) {
+        window.clearTimeout(busyClear);
+        busyClear = 0;
+      }
+      paintBusy(msg || "處理中…", true);
+    },
+    done: function (msg) {
+      busyDepth = Math.max(0, busyDepth - 1);
+      if (busyDepth) return;
+      if (!msg) {
+        paintBusy("", false);
+        return;
+      }
+      paintBusy(msg, false);
+      busyClear = window.setTimeout(function () {
+        busyClear = 0;
+        paintBusy("", false);
+      }, 1800);
+    },
+  };
+
   function downloadName(item, mime) {
     let name = String(item.rel || "photo").split(/[/\\]/).pop() || "photo";
     mime = String(mime || "");
@@ -202,7 +256,7 @@
   }
 
   function blobFile(item) {
-    return fetch(qs(item, "media"))
+    return fetch(qs(item, "full"))
       .then(function (res) {
         if (!res.ok) throw new Error("bad");
         return res.blob();
@@ -329,9 +383,14 @@
     return { w: nw, h: nh };
   }
 
+  function sameShape(slide, nw, nh) {
+    if (!slide || !slide.width || !slide.height || !nw || !nh) return false;
+    return Math.abs(slide.width / slide.height - nw / nh) < 0.01;
+  }
+
   function applySlideSize(content, nw, nh) {
-    const box = displayBox(nw, nh);
     if (!content) return;
+    const box = displayBox(nw, nh);
     content.width = box.w;
     content.height = box.h;
     if (content.data) {
@@ -342,12 +401,12 @@
     if (!slide) return;
     slide.width = box.w;
     slide.height = box.h;
-    if (typeof slide.updateContentSize === "function") {
-      slide.updateContentSize(true);
-    }
-    if (slide.pswp && typeof slide.pswp.updateSize === "function") {
-      slide.pswp.updateSize(true);
-    }
+    // resize() recalculates the zoom levels from the new shape before redrawing.
+    // Nudging updateContentSize alone left the old zoom behind, and the global
+    // updateSize this used to call re-laid every slide from a neighbour's load
+    // event, which is what warped photos after a few swipes.
+    if (typeof slide.resize === "function") slide.resize();
+    else if (typeof slide.updateContentSize === "function") slide.updateContentSize(true);
   }
 
   function monthLabel(group) {
@@ -358,7 +417,9 @@
 
   function slideFor(item, tile) {
     const tileUrl = qs(item, "thumb", "tile");
-    const box = displayBox(1600, 1067);
+    // The real shape comes from the index, so a portrait photo is never handed a
+    // landscape box and then corrected mid-swipe.
+    const box = displayBox(item.w, item.h);
     if (item.kind === "video") {
       const src = qs(item, "media");
       return {
@@ -464,7 +525,9 @@
         playVideo(video);
         const content = evt.content;
         function sizeVid() {
-          if (video.videoWidth) applySlideSize(content, video.videoWidth, video.videoHeight);
+          if (!video.videoWidth) return;
+          if (sameShape(content.slide, video.videoWidth, video.videoHeight)) return;
+          applySlideSize(content, video.videoWidth, video.videoHeight);
         }
         if (video.videoWidth) sizeVid();
         else video.addEventListener("loadedmetadata", sizeVid, { once: true });
@@ -487,7 +550,10 @@
     });
     lightbox.on("loadComplete", function (evt) {
       const el = evt.content && evt.content.element;
-      if (el && el.naturalWidth) applySlideSize(evt.content, el.naturalWidth, el.naturalHeight);
+      const slide = evt.content && evt.content.slide;
+      if (el && el.naturalWidth && !sameShape(slide, el.naturalWidth, el.naturalHeight)) {
+        applySlideSize(evt.content, el.naturalWidth, el.naturalHeight);
+      }
       if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
     });
     lightbox.on("close", function () {
@@ -768,29 +834,62 @@
       if (!window.confirm("把" + word + "丟進垃圾桶？三天內可救回。")) {
         return Promise.resolve();
       }
+      // Take the photos off the wall first. Rebuilding the whole album after the
+      // write is what used to freeze the screen and throw away the scroll place.
+      const chosen = {};
+      targetItems().forEach(function (item) {
+        chosen[itemKey(item)] = true;
+      });
+      const feed = document.getElementById("feed");
+      const pulled = [];
+      if (feed) {
+        feed.querySelectorAll(".tile").forEach(function (a) {
+          if (!chosen[a.dataset.key]) return;
+          a.classList.add("is-gone");
+          pulled.push(a);
+        });
+      }
+      const open = viewingItem();
+      if (open && chosen[itemKey(open)] && lightbox && lightbox.pswp) lightbox.pswp.close();
+      clearSelect();
+      window.FamilyBusy.start(rows.length > 1 ? "正在丟掉 " + rows.length + " 張…" : "正在丟掉…");
       return tagPost({
         action: "trash",
         person: currentPerson,
         photos: rows,
-      }).then(function () {
-        clearSelect();
-        window.FamilyFeed.start(currentPerson, currentTags, { trash: trashMode });
-      });
+      }).then(
+        function () {
+          window.FamilyBusy.done(rows.length > 1 ? "已丟掉 " + rows.length + " 張" : "已丟掉");
+        },
+        function () {
+          pulled.forEach(function (a) {
+            a.classList.remove("is-gone");
+          });
+          window.FamilyBusy.done("丟不掉，請再試一次");
+        }
+      );
     },
     tagSelected: function (label) {
       const rows = targetRows();
       const name = String(label || "").trim().replace(/^#/, "");
       if (!rows.length || !name) return Promise.resolve();
+      // A tag does not change how the grid looks, so nothing needs reloading.
+      clearSelect();
+      window.FamilyBusy.start("正在加上 #" + name + "…");
       return tagPost({
         action: "attach_many",
         person: currentPerson,
         kind: "custom",
         label: name,
         photos: rows,
-      }).then(function () {
-        clearSelect();
-        window.FamilyFeed.start(currentPerson, currentTags, { trash: trashMode });
-      });
+      }).then(
+        function () {
+          window.FamilyBusy.done("已加上 #" + name);
+        },
+        function () {
+          window.FamilyBusy.done("加不上，請再試一次");
+        }
+      );
     },
     downloadSelected: function () {
       if (!prepareAction()) return Promise.resolve();

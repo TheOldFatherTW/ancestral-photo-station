@@ -883,7 +883,7 @@ button, .btn {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: var(--kb, 0px);
   z-index: 20;
   padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(180deg, rgba(20, 16, 18, 0) 0%, rgba(20, 16, 18, 0.82) 28%, rgba(20, 16, 18, 0.94) 100%);
@@ -981,6 +981,71 @@ button, .btn {
   color: #fff;
   border: 1px dashed rgba(255, 255, 255, 0.55);
   cursor: pointer;
+}
+/* The keyboard covers the bottom of the window without shrinking it, so the sheet
+   is lifted by however much visualViewport says is hidden. */
+.kb-up .pswp-tag-sheet {
+  pointer-events: auto;
+  max-height: calc(100% - var(--kb, 0px) - 16px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 16px;
+  background: rgba(20, 16, 18, 0.96);
+}
+.kb-up .pswp-tag-sheet.is-video {
+  padding-bottom: 16px;
+}
+.kb-up .pswp-face-cube,
+.kb-up .photo-rail {
+  display: none !important;
+}
+.tag-chip-wrap.is-ghost {
+  opacity: 0.5;
+}
+.tile.is-gone {
+  display: none !important;
+}
+.work-note {
+  position: fixed;
+  left: 50%;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  transform: translateX(-50%);
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: calc(100vw - 32px);
+  padding: 9px 15px;
+  border-radius: 999px;
+  background: rgba(20, 16, 18, 0.92);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.34);
+  pointer-events: none;
+}
+.work-note[hidden] {
+  display: none !important;
+}
+.work-spin {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  animation: work-spin 0.7s linear infinite;
+}
+.work-note.is-done .work-spin {
+  display: none;
+}
+@keyframes work-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 @media (max-width: 560px) {
   .credit { white-space: normal; }

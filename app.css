@@ -440,7 +440,7 @@ a.cab {
 }
 .photo-rail {
   position: fixed;
-  left: max(8px, env(safe-area-inset-left, 0px));
+  right: max(8px, env(safe-area-inset-right, 0px));
   top: 50%;
   transform: translateY(-50%);
   z-index: 100010;
@@ -1004,6 +1004,23 @@ button, .btn {
     flex-basis: 40px;
   }
   .mode-btn { font-size: 10px; padding: 7px 12px; }
+}
+@media (min-width: 600px) and (pointer: coarse) {
+  .photo-rail {
+    gap: 18px;
+  }
+  .photo-rail .ins-icon {
+    width: 56px;
+    height: 56px;
+    flex-basis: 56px;
+  }
+  .photo-rail .ins-face {
+    inset: 4px;
+  }
+  .photo-rail .ins-icon svg {
+    width: 22px;
+    height: 22px;
+  }
 }
 @media (min-width: 768px) {
   .local-cabs.solo .cab-hud { width: min(600px, 100%); }

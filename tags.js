@@ -442,7 +442,21 @@
     paintFaces((data && data.photo && data.photo.faces) || []);
   }
 
+  function currentPswp() {
+    return window.FamilyFeed && typeof window.FamilyFeed.pswp === "function"
+      ? window.FamilyFeed.pswp()
+      : null;
+  }
+
   function currentPhotoImg() {
+    const pswp = currentPswp();
+    const slide = pswp && pswp.currSlide;
+    if (slide && slide.content) {
+      const el = slide.content.element;
+      if (el && el.tagName === "IMG" && el.parentNode) return el;
+      const ph = slide.getPlaceholderElement && slide.getPlaceholderElement();
+      if (ph && ph.parentNode) return ph;
+    }
     const items = document.querySelectorAll(".pswp__item");
     let item = null;
     items.forEach(function (el) {
@@ -460,6 +474,9 @@
 
   function ensureFaceLayer() {
     if (faceLayer && faceLayer.isConnected) return faceLayer;
+    document.querySelectorAll(".pswp-face-layer").forEach(function (el) {
+      el.remove();
+    });
     faceLayer = document.createElement("div");
     faceLayer.className = "pswp-face-layer";
     return faceLayer;
@@ -468,59 +485,44 @@
   function clearFaces() {
     faceTick += 1;
     faceBoxes = [];
-    if (faceLayer) faceLayer.remove();
+    document.querySelectorAll(".pswp-face-layer").forEach(function (el) {
+      el.remove();
+    });
     faceLayer = null;
   }
 
-  function currentPswp() {
-    return window.FamilyFeed && typeof window.FamilyFeed.pswp === "function"
-      ? window.FamilyFeed.pswp()
-      : null;
+  function wrapScale(slide) {
+    if (!slide) return 1;
+    const base = slide.currentResolution || (slide.zoomLevels && slide.zoomLevels.initial) || 1;
+    const z = (slide.currZoomLevel || base) / base;
+    return z > 0 ? z : 1;
   }
 
-  function layoutFaces() {
-    const tick = faceTick;
+  function syncFaceZoom() {
+    if (!faceLayer || !faceLayer.isConnected || !faceBoxes.length) return;
     const img = currentPhotoImg();
-    const layer = ensureFaceLayer();
-    if (sheetItem && sheetItem.kind === "video") {
-      if (layer.parentNode) layer.remove();
-      return;
-    }
-    applyFaceCube();
-    if (!faceBoxes.length) {
-      if (layer.parentNode) layer.remove();
-      return;
-    }
+    if (!img || !img.parentNode) return;
     const pswp = currentPswp();
-    const root = pswp && pswp.element;
-    if (!img || !root) {
-      if (img) img.addEventListener("load", layoutFaces, { once: true });
-      setTimeout(function () {
-        if (tick === faceTick) layoutFaces();
-      }, 120);
-      return;
+    const content = pswp && pswp.currSlide && pswp.currSlide.content;
+    let w = img.offsetWidth;
+    let h = img.offsetHeight;
+    if (content && content.element === img && content.displayedImageWidth >= 8) {
+      w = content.displayedImageWidth;
+      h = content.displayedImageHeight;
     }
-    const ir = img.getBoundingClientRect();
-    const rr = root.getBoundingClientRect();
-    if (ir.width < 8 || ir.height < 8) {
-      setTimeout(function () {
-        if (tick === faceTick) layoutFaces();
-      }, 120);
-      return;
-    }
-    if (layer.parentNode !== root) root.appendChild(layer);
-    applyFaceCube();
-    layer.style.left = ir.left - rr.left + "px";
-    layer.style.top = ir.top - rr.top + "px";
-    layer.style.width = ir.width + "px";
-    layer.style.height = ir.height + "px";
+    if (w < 8 || h < 8) return;
+    const widthPx = w + "px";
+    const heightPx = h + "px";
+    if (faceLayer.style.width !== widthPx) faceLayer.style.width = widthPx;
+    if (faceLayer.style.height !== heightPx) faceLayer.style.height = heightPx;
+    const leftPx = img.offsetLeft + "px";
+    const topPx = img.offsetTop + "px";
+    if (faceLayer.style.left !== leftPx) faceLayer.style.left = leftPx;
+    if (faceLayer.style.top !== topPx) faceLayer.style.top = topPx;
+    faceLayer.style.setProperty("--face-z", String(wrapScale(pswp && pswp.currSlide)));
   }
 
-  function paintFaces(faces) {
-    const tick = ++faceTick;
-    faceBoxes = (faces || []).filter(function (face) {
-      return face && face.bbox && face.bbox.length === 4;
-    });
+  function fillFaceBoxes() {
     const layer = ensureFaceLayer();
     layer.innerHTML = "";
     faceBoxes.forEach(function (face) {
@@ -564,13 +566,53 @@
       box.appendChild(x);
       layer.appendChild(box);
     });
-    layoutFaces();
-    requestAnimationFrame(layoutFaces);
-    [80, 320, 900, 1800].forEach(function (ms) {
-      setTimeout(function () {
-        if (tick === faceTick) layoutFaces();
-      }, ms);
+    if (selectedTag) highlightFace(selectedTag);
+  }
+
+  function layoutFaces() {
+    const layer = ensureFaceLayer();
+    if (sheetItem && sheetItem.kind === "video") {
+      if (layer.parentNode) layer.remove();
+      return;
+    }
+    applyFaceCube();
+    if (!faceBoxes.length) {
+      if (layer.parentNode) layer.remove();
+      return;
+    }
+    const img = currentPhotoImg();
+    const wrap = img && img.parentNode;
+    if (!img || !wrap || img.offsetWidth < 8 || img.offsetHeight < 8) {
+      if (img && !img.complete && !img.dataset.faceLay) {
+        img.dataset.faceLay = "1";
+        img.addEventListener(
+          "load",
+          function () {
+            img.dataset.faceLay = "";
+            layoutFaces();
+          },
+          { once: true }
+        );
+      }
+      return;
+    }
+    wrap.appendChild(layer);
+    if (!layer.querySelector(".pswp-face")) fillFaceBoxes();
+    applyFaceCube();
+    syncFaceZoom();
+  }
+
+  function paintFaces(faces) {
+    faceTick += 1;
+    faceBoxes = (faces || []).filter(function (face) {
+      return face && face.bbox && face.bbox.length === 4;
     });
+    if (!faceBoxes.length) {
+      layoutFaces();
+      return;
+    }
+    fillFaceBoxes();
+    layoutFaces();
   }
 
   function highlightFace(id) {
@@ -620,6 +662,9 @@
 
   function loadPhoto(item) {
     sheetItem = item;
+    faceTick += 1;
+    faceBoxes = [];
+    if (faceLayer) faceLayer.innerHTML = "";
     const node = hostSheet();
     node.hidden = false;
     node.classList.toggle("is-video", item.kind === "video");
@@ -672,6 +717,7 @@
       loadPhoto(item);
     },
     layoutFaces: layoutFaces,
+    syncFaceZoom: syncFaceZoom,
     closePhoto: closePhoto,
     act: post,
     DELETE_ID: DELETE_ID,

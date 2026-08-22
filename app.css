@@ -578,11 +578,6 @@ a.cab {
   object-fit: contain;
   background: #000;
 }
-.pswp-vid-zoom {
-  position: absolute;
-  inset: 0 0 52px 0;
-  z-index: 1;
-}
 .vid-wait {
   position: absolute;
   left: 50%;
@@ -729,16 +724,27 @@ button, .btn {
   pointer-events: none;
   z-index: 15;
   overflow: visible;
+  --face-z: 1;
 }
 .pswp-face-layer.is-off {
   display: none !important;
 }
-.pswp-trash {
+.pswp-trash.ins-icon {
   position: absolute;
-  top: 64px;
-  right: 16px;
+  top: 10px;
+  right: 64px;
   z-index: 21;
+  width: 48px;
+  height: 48px;
+  flex-basis: 48px;
   color: #111;
+}
+.pswp-trash .ins-face {
+  inset: 3px;
+}
+.pswp-trash svg {
+  width: 20px;
+  height: 20px;
 }
 .pswp-trash[hidden] {
   display: none !important;
@@ -831,6 +837,8 @@ button, .btn {
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.02em;
+  transform: scale(calc(1 / var(--face-z, 1)));
+  transform-origin: left bottom;
 }
 .pswp-tag-sheet .tag-chip.is-on {
   background: linear-gradient(120deg, #fa7e1e 0%, #d62976 48%, #962fbf 100%);
@@ -871,6 +879,8 @@ button, .btn {
 .pswp-face > .ins-x {
   top: -8px;
   right: -8px;
+  transform: scale(calc(1 / var(--face-z, 1)));
+  transform-origin: right top;
 }
 .pswp-tag-sheet {
   position: absolute;
@@ -990,6 +1000,11 @@ button, .btn {
     width: 36px;
     height: 36px;
     flex-basis: 36px;
+  }
+  .pswp-trash.ins-icon {
+    width: 48px;
+    height: 48px;
+    flex-basis: 48px;
   }
   .mode-btn { font-size: 10px; padding: 7px 12px; }
 }

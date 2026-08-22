@@ -213,11 +213,11 @@
       const src = qs(item, "media");
       return {
         html:
-          '<div class="pswp-video"><video controls playsinline webkit-playsinline preload="none" poster="' +
+          '<div class="pswp-video"><video controls playsinline webkit-playsinline preload="auto" poster="' +
           tileUrl.replace(/"/g, "") +
           '" src="' +
           src.replace(/"/g, "") +
-          '"></video><p class="vid-wait" hidden>影片準備中…</p><div class="pswp-vid-zoom"></div></div>',
+          '"></video><p class="vid-wait" hidden>影片準備中…</p></div>',
         msrc: tileUrl,
         width: box.w,
         height: box.h,
@@ -274,6 +274,13 @@
     });
   }
 
+  function playVideo(video) {
+    if (!video) return;
+    video.playsInline = true;
+    const play = video.play();
+    if (play && play.catch) play.catch(function () {});
+  }
+
   function ensureLightbox() {
     if (lightbox || !window.PhotoSwipeLightbox || !window.PhotoSwipe) return lightbox;
     lightbox = new window.PhotoSwipeLightbox({
@@ -304,6 +311,7 @@
       }
       if (video) {
         bindVideoWait(video);
+        playVideo(video);
         const content = evt.content;
         function sizeVid() {
           if (video.videoWidth) applySlideSize(content, video.videoWidth, video.videoHeight);
@@ -311,6 +319,7 @@
         if (video.videoWidth) sizeVid();
         else video.addEventListener("loadedmetadata", sizeVid, { once: true });
       }
+      if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
     });
     lightbox.on("contentDeactivate", function (evt) {
       const el = evt.content && evt.content.element;
@@ -337,8 +346,21 @@
       });
       if (window.FamilyTags) window.FamilyTags.closePhoto();
     });
-    lightbox.on("contentActivate", function () {
-      if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
+    lightbox.on("afterInit", function () {
+      const pswp = lightbox.pswp;
+      if (!pswp) return;
+      pswp.on("resize", function () {
+        if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
+      });
+      pswp.on("imageSizeChange", function () {
+        if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
+      });
+      pswp.on("resolutionChanged", function () {
+        if (window.FamilyTags && window.FamilyTags.syncFaceZoom) window.FamilyTags.syncFaceZoom();
+      });
+      pswp.on("zoomPanUpdate", function () {
+        if (window.FamilyTags && window.FamilyTags.syncFaceZoom) window.FamilyTags.syncFaceZoom();
+      });
     });
     lightbox.on("change", function () {
       if (!lightbox.pswp || !lightbox._slides) return;
@@ -353,20 +375,6 @@
       const slide = lightbox._slides[lightbox.pswp.currIndex];
       if (window.FamilyTags && slide && slide.familyItem) {
         window.FamilyTags.showPhoto(slide.familyItem);
-      }
-      if (lightbox.pswp && !lightbox._faceLay) {
-        lightbox._faceLay = true;
-        lightbox.pswp.on("resize", function () {
-          if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
-        });
-        lightbox.pswp.on("zoomPanUpdate", function () {
-          if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
-        });
-        lightbox.pswp.on("loadComplete", function (evt) {
-          const el = evt.content && evt.content.element;
-          if (el && el.naturalWidth) applySlideSize(evt.content, el.naturalWidth, el.naturalHeight);
-          if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
-        });
       }
     });
     lightbox.init();
@@ -492,6 +500,9 @@
           if (!lb) return;
           lb._slides = slides;
           lb.loadAndOpen(index);
+          if (item.kind === "video") {
+            playVideo(document.querySelector(".pswp-video video"));
+          }
         });
         return a;
       }

@@ -20,9 +20,16 @@
   let uploadPerson = "";
   let uploadBtn = null;
   let uploadBusy = false;
-  let heldNote = "";
+  let uploadTip = null;
+  let upBar = null;
+  let upHide = 0;
   const UPLOAD_CAP = 480 * 1024 * 1024;
   const BATCH_CAP = 40 * 1024 * 1024;
+  const TIP_LINES = [
+    "一次挑 20～30 張最順。",
+    "按下相簿右上角的「加入」以後，iPhone 會自己把每一張照片轉檔，選照片那頁會停住十幾秒到好幾分鐘，畫面看起來像當掉。那是正常的，請等它自己跳回來，不要關掉。",
+    "想快很多：在選照片那頁的右上角按「選項」，把「格式」從「自動」改成「目前」。這樣 iPhone 就不轉檔，直接交出原檔，家裡那台照收。",
+  ];
   let backupAsk = {};
   const CAMERA =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="8" width="17" height="11.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 8l1.4-2.4h5.2L16 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="13.6" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>';
@@ -135,11 +142,61 @@
     if (statusEl) statusEl.textContent = msg || DISCONNECTED;
   }
 
-  // The twelve second poll rewrites the status line, which silently ate every word an
-  // upload tried to say. Anything held here outranks the poll until the job lets go.
-  function hold(msg) {
-    heldNote = msg || "";
-    if (statusEl && heldNote) statusEl.textContent = heldNote;
+  function mb(bytes) {
+    const n = bytes / (1024 * 1024);
+    return (n < 10 ? n.toFixed(1) : Math.round(n)) + " MB";
+  }
+
+  // The twelve second poll rewrites the status line, and the album scrolls it off the
+  // top the moment there are photos, so an upload gets a strip that stays put instead.
+  function upNode() {
+    if (upBar) return upBar;
+    upBar = document.createElement("div");
+    upBar.className = "up-bar";
+    upBar.hidden = true;
+    const main = document.createElement("div");
+    main.className = "up-main";
+    const meter = document.createElement("div");
+    meter.className = "hp-meter";
+    const track = document.createElement("div");
+    track.className = "hp-track";
+    const fill = document.createElement("div");
+    fill.className = "hp-fill";
+    track.appendChild(fill);
+    const num = document.createElement("span");
+    num.className = "hp-num";
+    meter.appendChild(track);
+    meter.appendChild(num);
+    const sub = document.createElement("div");
+    sub.className = "up-sub";
+    upBar.appendChild(main);
+    upBar.appendChild(meter);
+    upBar.appendChild(sub);
+    document.body.appendChild(upBar);
+    return upBar;
+  }
+
+  function paintUp(main, sub, ratio) {
+    const bar = upNode();
+    if (upHide) {
+      window.clearTimeout(upHide);
+      upHide = 0;
+    }
+    bar.hidden = false;
+    bar.querySelector(".up-main").textContent = main;
+    bar.querySelector(".up-sub").textContent = sub || "";
+    const pct = ratio == null ? null : Math.max(0, Math.min(100, Math.round(ratio * 100)));
+    bar.querySelector(".hp-meter").hidden = pct == null;
+    bar.querySelector(".hp-fill").style.width = (pct == null ? 0 : pct) + "%";
+    bar.querySelector(".hp-num").textContent = pct == null ? "" : pct + "%";
+  }
+
+  function closeUp(after) {
+    if (upHide) window.clearTimeout(upHide);
+    upHide = window.setTimeout(function () {
+      upHide = 0;
+      if (upBar) upBar.hidden = true;
+    }, after);
   }
 
   function pickCover(person) {
@@ -190,6 +247,56 @@
   function pickUpload(person, btn) {
     uploadPerson = person;
     uploadBtn = btn || null;
+    openTip();
+  }
+
+  // iOS hands the pictures over in "compatible" format whatever the accept attribute
+  // says, so it re-encodes every HEIC before the picker will close. That wait looks
+  // exactly like a dead button, and the only cure is knowing it is coming.
+  function openTip() {
+    if (!uploadTip) {
+      uploadTip = document.createElement("div");
+      uploadTip.className = "up-tip";
+      uploadTip.hidden = true;
+      const card = document.createElement("div");
+      card.className = "up-card";
+      const head = document.createElement("h3");
+      head.textContent = "手動上傳照片";
+      card.appendChild(head);
+      TIP_LINES.forEach(function (line) {
+        const p = document.createElement("p");
+        p.textContent = line;
+        card.appendChild(p);
+      });
+      const btns = document.createElement("div");
+      btns.className = "up-card-btns";
+      const skip = document.createElement("button");
+      skip.type = "button";
+      skip.className = "up-skip";
+      skip.textContent = "先不要";
+      skip.addEventListener("click", function () {
+        uploadTip.hidden = true;
+      });
+      const go = document.createElement("button");
+      go.type = "button";
+      go.className = "up-go";
+      go.textContent = "選照片";
+      // Reading the card takes longer than the few seconds iOS keeps a tap valid for,
+      // so the picker has to open off this button rather than off the one behind it.
+      go.addEventListener("click", function () {
+        uploadTip.hidden = true;
+        openPicker();
+      });
+      btns.appendChild(skip);
+      btns.appendChild(go);
+      card.appendChild(btns);
+      uploadTip.appendChild(card);
+      document.body.appendChild(uploadTip);
+    }
+    uploadTip.hidden = false;
+  }
+
+  function openPicker() {
     if (!uploadInput) {
       uploadInput = document.createElement("input");
       uploadInput.type = "file";
@@ -204,10 +311,10 @@
         const who = uploadPerson;
         uploadInput.value = "";
         if (!picked.length || !who) return;
-        // Say something before anything touches file.size: on iOS that is what forces
-        // the HEIC to JPEG conversion, and it can sit there for a minute saying nothing.
+        // Let the strip paint before the sizes get added up, so a big pick does not
+        // spend its first moment back from the picker looking just as dead as before.
         if (uploadBtn) uploadBtn.classList.add("is-run");
-        hold("讀取 " + picked.length + " 張照片…");
+        paintUp("讀取 " + picked.length + " 張照片…", "", null);
         window.setTimeout(function () {
           sendUploads(who, picked);
         }, 50);
@@ -224,56 +331,82 @@
     }
     uploadBusy = true;
     const url = api("/api/upload?person=" + encodeURIComponent(person));
-    let sent = 0;
+    // Grouped by weight rather than count: one pass of holiday videos and one pass of
+    // screenshots are wildly different sizes, and a whole pick in one POST would be refused.
+    const groups = [];
     let saved = 0;
     let already = 0;
     let failed = 0;
-    // Batched by weight rather than count: one pass of holiday videos and one pass of
-    // screenshots are wildly different sizes, and a whole pick in one POST would be refused.
-    let batch = [];
+    let total = 0;
     let bytes = 0;
-    async function flush() {
-      if (!batch.length) return;
-      const body = new FormData();
-      batch.forEach(function (f) {
-        body.append("photo", f, f.name || "photo.jpg");
-      });
-      const n = batch.length;
-      batch = [];
-      bytes = 0;
-      try {
-        const res = await fetch(url, { method: "POST", body: body });
-        const data = await res.json().catch(function () {
-          return {};
-        });
-        if (!res.ok) throw new Error(data.error || "fail");
-        saved += (data.saved || []).length;
-        already += (data.already || []).length;
-        failed += (data.rejected || []).length;
-      } catch (err) {
-        failed += n;
+    files.forEach(function (f) {
+      if (f.size > UPLOAD_CAP) {
+        failed += 1;
+        return;
       }
-      sent += n;
-      hold("上傳中 " + sent + "/" + files.length + "…");
-    }
-    hold("上傳中 0/" + files.length + "…");
+      if (!groups.length || bytes + f.size > BATCH_CAP) {
+        groups.push([]);
+        bytes = 0;
+      }
+      groups[groups.length - 1].push(f);
+      bytes += f.size;
+      total += f.size;
+    });
+    const note =
+      "共 " +
+      files.length +
+      " 張、" +
+      mb(total) +
+      "，分 " +
+      groups.length +
+      " 批送。傳完之前請不要鎖螢幕或切到別的 App。";
+    let done = 0;
     try {
-      for (const f of files) {
-        if (f.size > UPLOAD_CAP) {
-          failed += 1;
-          sent += 1;
-          continue;
+      for (let i = 0; i < groups.length; i += 1) {
+        const group = groups[i];
+        const body = new FormData();
+        let weight = 0;
+        group.forEach(function (f) {
+          body.append("photo", f, f.name || "photo.jpg");
+          weight += f.size;
+        });
+        const head = "上傳中 第 " + (i + 1) + " 批／共 " + groups.length + " 批";
+        paintUp(head, note, total ? done / total : 0);
+        const data = await new Promise(function (resolve) {
+          // fetch cannot report how far a body has got, so a run that takes minutes
+          // through the tunnel would have nothing truthful to put in the bar.
+          const xhr = new XMLHttpRequest();
+          xhr.open("POST", url, true);
+          xhr.upload.onprogress = function (ev) {
+            if (!ev.lengthComputable || !total) return;
+            paintUp(head, note, (done + Math.min(ev.loaded, weight)) / total);
+          };
+          xhr.onload = function () {
+            let out = null;
+            try {
+              out = JSON.parse(xhr.responseText);
+            } catch (e) {}
+            resolve(xhr.status >= 200 && xhr.status < 300 ? out : null);
+          };
+          xhr.onerror = function () {
+            resolve(null);
+          };
+          xhr.send(body);
+        });
+        if (data) {
+          saved += (data.saved || []).length;
+          already += (data.already || []).length;
+          failed += (data.rejected || []).length;
+        } else {
+          failed += group.length;
         }
-        if (bytes + f.size > BATCH_CAP && batch.length) await flush();
-        batch.push(f);
-        bytes += f.size;
+        done += weight;
       }
-      await flush();
       const bits = [];
       if (saved) bits.push("收進來 " + saved + " 張");
       if (already) bits.push(already + " 張本來就有");
       if (failed) bits.push(failed + " 張傳不上來，再試一次");
-      hold(bits.length ? bits.join("，") : "沒有新的照片");
+      paintUp(bits.length ? bits.join("，") : "沒有新的照片", "", 1);
       if (saved) {
         lastCab = "";
         await boot();
@@ -282,16 +415,13 @@
         }
       }
     } catch (err) {
-      hold("上傳出錯了：" + (err && err.message ? err.message : "連不上家裡那台"));
+      paintUp("上傳出錯了：" + (err && err.message ? err.message : "連不上家裡那台"), "", null);
     } finally {
       uploadBusy = false;
       if (uploadBtn) uploadBtn.classList.remove("is-run");
-      // The outcome has to survive long enough to be read, but it must not become the
-      // permanent status line, so the poll gets its job back after a spell.
-      const said = heldNote;
-      window.setTimeout(function () {
-        if (heldNote === said) hold("");
-      }, 20000);
+      // The outcome has to survive long enough to be read, but the strip must not
+      // become permanent furniture, so it takes itself away after a spell.
+      closeUp(20000);
     }
   }
 
@@ -591,7 +721,7 @@
     }
     try {
       const pub = await readJson("/api/public");
-      if (statusEl && !heldNote) statusEl.textContent = lineFrom(pub);
+      if (statusEl) statusEl.textContent = lineFrom(pub);
       const cab = await readJson("/api/cabinets");
       names = {};
       (cab.people || []).forEach(function (p) {

@@ -30,6 +30,7 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(Object.assign({ person: person }, body)),
     }).then(function (res) {
+      if (!res.ok) throw new Error("bad");
       return res.json();
     });
   }

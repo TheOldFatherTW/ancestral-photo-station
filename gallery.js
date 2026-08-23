@@ -2,9 +2,10 @@
   const ORIGIN = (window.VAULT_ORIGIN || "").replace(/\/$/, "");
   const FIRST = 12;
   const LIMIT = 24;
-  const THUMB_FAST = 8;
-  const THUMB_SLOW = 3;
+  const THUMB_CAP = 6;
   const SELECT_MAX = 99;
+  const THUMB_CACHE = "famiphoto-thumbs-v1";
+  const SKIP_TRASH_KEY = "family.skipTrashAsk";
   document.addEventListener("contextmenu", function (ev) {
     const t = ev.target && ev.target.closest;
     if (!t) return;
@@ -14,7 +15,9 @@
   let lightbox;
   let thumbActive = 0;
   const thumbWait = [];
+  const blobUrls = [];
   let paintHint = function () {};
+  let afterThumbs = function () {};
   let currentPerson = "";
   let currentTags = [];
   let trashMode = false;
@@ -29,17 +32,85 @@
     return url + (path.indexOf("?") >= 0 ? "&" : "?") + "k=" + encodeURIComponent(k);
   }
 
+  function thumbsBusy() {
+    return thumbActive > 0 || thumbWait.length > 0;
+  }
+
+  function dropBlobs() {
+    blobUrls.forEach(function (u) {
+      try {
+        URL.revokeObjectURL(u);
+      } catch (e) {}
+    });
+    blobUrls.length = 0;
+  }
+
   function pumpThumbs() {
-    const cap = thumbWait.length > 16 ? THUMB_SLOW : THUMB_FAST;
-    while (thumbActive < cap && thumbWait.length) {
+    while (thumbActive < THUMB_CAP && thumbWait.length) {
       const job = thumbWait.shift();
       thumbActive += 1;
       job(function () {
         thumbActive -= 1;
         pumpThumbs();
         paintHint();
+        if (!thumbsBusy()) afterThumbs();
       });
     }
+  }
+
+  function thumbCache() {
+    if (!window.caches) return Promise.resolve(null);
+    return caches.open(THUMB_CACHE).catch(function () {
+      return null;
+    });
+  }
+
+  function readCachedThumb(url) {
+    return thumbCache()
+      .then(function (cache) {
+        if (!cache) return null;
+        return cache.match(url);
+      })
+      .then(function (res) {
+        return res ? res.blob() : null;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
+  function writeCachedThumb(url, blob) {
+    if (!blob) return;
+    thumbCache()
+      .then(function (cache) {
+        if (!cache) return;
+        return cache.put(
+          url,
+          new Response(blob, { headers: { "Content-Type": blob.type || "image/jpeg" } })
+        );
+      })
+      .catch(function () {
+        caches.delete(THUMB_CACHE);
+      });
+  }
+
+  function showBlob(img, blob, onReady) {
+    const obj = URL.createObjectURL(blob);
+    blobUrls.push(obj);
+    function done() {
+      img.removeEventListener("load", onLoad);
+      img.removeEventListener("error", onErr);
+      if (onReady) onReady();
+    }
+    function onLoad() {
+      done();
+    }
+    function onErr() {
+      done();
+    }
+    img.addEventListener("load", onLoad);
+    img.addEventListener("error", onErr);
+    img.src = obj;
   }
 
   function watchThumb(img, url) {
@@ -66,32 +137,54 @@
   }
 
   function bindThumb(img, url, onReady) {
-    let tries = 0;
-    function start(done) {
-      function settle() {
-        img.removeEventListener("load", onLoad);
-        img.removeEventListener("error", onErr);
-        if (done) done();
+    readCachedThumb(url).then(function (cached) {
+      if (cached) {
+        showBlob(img, cached, onReady);
+        return;
       }
-      function onLoad() {
-        settle();
-        if (onReady) onReady();
+      let tries = 0;
+      function start(done) {
+        function settle() {
+          if (done) done();
+        }
+        fetch(url, { mode: "cors", credentials: "omit" })
+          .then(function (res) {
+            if (!res.ok) throw new Error("bad");
+            return res.blob();
+          })
+          .then(function (blob) {
+            writeCachedThumb(url, blob);
+            showBlob(img, blob, function () {
+              settle();
+              if (img.isConnected && onReady) onReady();
+            });
+          })
+          .catch(function () {
+            function onLoad() {
+              img.removeEventListener("load", onLoad);
+              img.removeEventListener("error", onErr);
+              settle();
+              if (img.isConnected && onReady) onReady();
+            }
+            function onErr() {
+              img.removeEventListener("load", onLoad);
+              img.removeEventListener("error", onErr);
+              settle();
+              if (tries >= 1) return;
+              tries += 1;
+              window.setTimeout(function () {
+                thumbWait.push(start);
+                pumpThumbs();
+              }, 450 * tries);
+            }
+            img.addEventListener("load", onLoad);
+            img.addEventListener("error", onErr);
+            img.src = tries ? url + "&retry=" + tries : url;
+          });
       }
-      function onErr() {
-        settle();
-        if (tries >= 1) return;
-        tries += 1;
-        window.setTimeout(function () {
-          thumbWait.push(start);
-          pumpThumbs();
-        }, 450 * tries);
-      }
-      img.addEventListener("load", onLoad);
-      img.addEventListener("error", onErr);
-      img.src = tries ? url + "&retry=" + tries : url;
-    }
-    thumbWait.push(start);
-    pumpThumbs();
+      thumbWait.push(start);
+      pumpThumbs();
+    });
   }
 
   function qs(item, kind, size) {
@@ -266,6 +359,50 @@
     },
   };
 
+  function skipTrashAsk() {
+    try {
+      return localStorage.getItem(SKIP_TRASH_KEY) === "1";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function rememberSkipTrash() {
+    try {
+      localStorage.setItem(SKIP_TRASH_KEY, "1");
+    } catch (e) {}
+  }
+
+  function askTrash() {
+    if (skipTrashAsk()) return Promise.resolve(true);
+    return new Promise(function (resolve) {
+      const mask = document.createElement("div");
+      mask.className = "ask-mask";
+      mask.innerHTML =
+        '<div class="ask-card" role="dialog" aria-modal="true">' +
+        "<p>將照片丟進垃圾桶?</p>" +
+        '<label class="ask-skip"><span>不再提示</span><input type="checkbox" role="switch"/><span class="ask-sw"></span></label>' +
+        '<div class="ask-actions"><button type="button" class="ask-no">取消</button><button type="button" class="ask-yes">丟掉</button></div>' +
+        "</div>";
+      const box = mask.querySelector("input");
+      function finish(ok) {
+        if (ok && box && box.checked) rememberSkipTrash();
+        mask.remove();
+        resolve(ok);
+      }
+      mask.querySelector(".ask-no").addEventListener("click", function () {
+        finish(false);
+      });
+      mask.querySelector(".ask-yes").addEventListener("click", function () {
+        finish(true);
+      });
+      mask.addEventListener("click", function (ev) {
+        if (ev.target === mask) finish(false);
+      });
+      document.body.appendChild(mask);
+    });
+  }
+
   function downloadName(item, mime) {
     let name = String(item.rel || "photo").split(/[/\\]/).pop() || "photo";
     mime = String(mime || "");
@@ -386,6 +523,7 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }).then(function (res) {
+      if (!res.ok) throw new Error("bad");
       return res.json();
     });
   }
@@ -639,6 +777,7 @@
         window.thumbObserver = null;
       }
       thumbWait.length = 0;
+      dropBlobs();
       feed.innerHTML = "";
       feed.dataset.person = person;
       feed.dataset.tags = (tagIds || []).join(",");
@@ -689,7 +828,6 @@
         a.dataset.key = itemKey(item);
         const img = document.createElement("img");
         img.decoding = "async";
-        img.loading = "lazy";
         img.alt = "";
         img.draggable = false;
         watchThumb(img, qs(item, "thumb", "tile"));
@@ -757,9 +895,15 @@
         return box.top < (window.innerHeight || 0) + 1600;
       }
 
+      afterThumbs = function () {
+        if (my !== run) return;
+        if (sentinelNear()) loadMore();
+      };
+
       async function loadMore() {
         if (loading || my !== run) return;
         if (total && offset >= total) return;
+        if (offset && thumbsBusy()) return;
         loading = true;
         showHint();
         let got = 0;
@@ -815,9 +959,6 @@
           loading = false;
           showHint();
         }
-        if (my === run && got > 0 && (!total || offset < total) && offset > FIRST && sentinelNear()) {
-          loadMore();
-        }
       }
 
       if (window.feedObserver) window.feedObserver.disconnect();
@@ -852,12 +993,8 @@
         prepareAction();
         return Promise.resolve();
       }
-      const word = rows.length === 1 ? "這張" : "選取的 " + rows.length + " 張";
-      if (!window.confirm("把" + word + "丟進垃圾桶？三天內可救回。")) {
-        return Promise.resolve();
-      }
-      // Take the photos off the wall first. Rebuilding the whole album after the
-      // write is what used to freeze the screen and throw away the scroll place.
+      return askTrash().then(function (ok) {
+        if (!ok) return;
       const chosen = {};
       targetItems().forEach(function (item) {
         chosen[itemKey(item)] = true;
@@ -890,6 +1027,7 @@
           window.FamilyBusy.done("丟不掉，請再試一次");
         }
       );
+      });
     },
     tagSelected: function (label) {
       const rows = targetRows();
@@ -933,9 +1071,11 @@
     stop: function () {
       run += 1;
       paintHint = function () {};
+      afterThumbs = function () {};
       currentPerson = "";
       trashMode = false;
       clearSelect();
+      dropBlobs();
       if (window.thumbObserver) window.thumbObserver.disconnect();
       window.thumbObserver = null;
       if (window.feedObserver) window.feedObserver.disconnect();

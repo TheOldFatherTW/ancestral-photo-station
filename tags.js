@@ -256,6 +256,16 @@
       row.appendChild(empty);
     }
     let renaming = null;
+    function renameTarget() {
+      if (renaming) return renaming;
+      const on = row.querySelector(".tag-chip-wrap.is-on");
+      if (!on) return null;
+      const id = on.dataset.id;
+      for (let i = 0; i < tags.length; i++) {
+        if (tags[i].id === id && RENAMEABLE[tags[i].kind]) return tags[i];
+      }
+      return null;
+    }
     const form = document.createElement("form");
     form.className = "pswp-tag-add";
     const input = document.createElement("input");
@@ -286,7 +296,7 @@
 
     function askMerge(src, dst) {
       const ok = window.confirm(
-        "要把「" + src.label + "」合併進「" + dst.label + "」嗎？全相簿一起改。"
+        "要把「#" + src.label + "」改成「#" + dst.label + "」嗎？"
       );
       if (!ok) return;
       runChange(
@@ -310,14 +320,12 @@
         );
         return;
       }
-      const ok = window.confirm(
-        "刪除「#" + tag.label + "」？所有照片上的這個標記都會消失。"
-      );
+      const ok = window.confirm("從這張拿掉「#" + tag.label + "」？");
       if (!ok) return;
       runChange(
-        { action: "delete", id: tag.id },
-        "正在刪除 #" + tag.label + "…",
-        "已刪除 #" + tag.label
+        { action: "detach", id: tag.id },
+        "正在拿掉 #" + tag.label + "…",
+        "已從這張拿掉 #" + tag.label
       );
     }
 
@@ -331,7 +339,8 @@
 
     function matches() {
       const q = input.value;
-      if (renaming) return catalogOf(q, { kind: renaming.kind, exceptId: renaming.id });
+      const target = renameTarget();
+      if (target) return catalogOf(q, { kind: target.kind, exceptId: target.id });
       return catalogOf(q, { exceptIds: onPhoto });
     }
 
@@ -348,8 +357,9 @@
         pick.type = "button";
         pick.textContent = "#" + hit.label;
         pick.addEventListener("click", function () {
-          if (renaming) {
-            askMerge(renaming, hit);
+          const target = renameTarget();
+          if (target) {
+            askMerge(target, hit);
             return;
           }
           ghostChip(hit.label);
@@ -400,15 +410,16 @@
         askDeleteTag(tag);
       });
       chip.addEventListener("click", function () {
-        const again = wrap.classList.contains("is-on");
         highlightFace(tag.id);
         showChipX();
-        if (renaming && renaming.id === tag.id) {
-          exitRename();
+        if (!RENAMEABLE[tag.kind]) {
+          if (renaming) exitRename();
           return;
         }
-        if (!RENAMEABLE[tag.kind] || !again) {
-          if (renaming) exitRename();
+        if (renaming && renaming.id === tag.id) {
+          exitRename();
+          highlightFace(null);
+          showChipX();
           return;
         }
         enterRename(tag);
@@ -430,17 +441,18 @@
       if (!byAdd) return;
       const label = (input.value || "").trim();
       if (!label) return;
-      if (renaming) {
-        const was = renaming.label;
+      const target = renameTarget();
+      if (target) {
+        const was = target.label;
         const exact = matches().filter(function (hit) {
           return String(hit.label) === label;
         });
         if (exact.length === 1) {
-          askMerge(renaming, exact[0]);
+          askMerge(target, exact[0]);
           return;
         }
         runChange(
-          { action: "rename", id: renaming.id, label: label },
+          { action: "rename", id: target.id, label: label },
           "正在把 #" + was + " 改成 #" + label + "…",
           "已改成 #" + label
         );
@@ -588,13 +600,13 @@
         ev.preventDefault();
         ev.stopPropagation();
         const ok = window.confirm(
-          "刪除「#" + (face.label || "") + "」？所有照片上的這個標記都會消失。"
+          "從這張拿掉「#" + (face.label || "") + "」？"
         );
         if (!ok) return;
         runChange(
-          { action: "delete", id: face.id },
-          "正在刪除 #" + (face.label || "") + "…",
-          "已刪除 #" + (face.label || "")
+          { action: "detach", id: face.id },
+          "正在拿掉 #" + (face.label || "") + "…",
+          "已從這張拿掉 #" + (face.label || "")
         );
       });
       box.addEventListener("click", function (ev) {

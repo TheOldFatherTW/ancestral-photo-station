@@ -62,8 +62,25 @@
     });
   }
 
+  function cookiePath() {
+    return location.pathname.replace(/[^/]+$/, "") || "/";
+  }
+
+  function writeViewCookie(token) {
+    if (!KEY_RE.test(token || "")) return;
+    document.cookie =
+      "family.viewKey=" +
+      encodeURIComponent(token) +
+      "; path=" +
+      cookiePath() +
+      "; max-age=31536000; Secure; SameSite=Lax";
+  }
+
   function writeInstallManifest(token) {
     if (!KEY_RE.test(token || "")) return;
+    // iOS 16.4+ ignores the current URL and launches start_url. A static ./
+    // empties the icon. data: manifests are also ignored. Do not attach one.
+    if (typeof navigator.standalone === "boolean") return;
     const start = new URL("./", location.href);
     start.searchParams.set("k", token);
     const icon = function (file, size) {
@@ -91,8 +108,12 @@
         icon("rose-two-512.png", "512x512"),
       ],
     };
-    const link = document.querySelector('link[rel="manifest"]');
-    if (!link) return;
+    let link = document.querySelector('link[rel="manifest"]');
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "manifest";
+      document.head.appendChild(link);
+    }
     link.setAttribute(
       "href",
       "data:application/manifest+json," + encodeURIComponent(JSON.stringify(manifest))
@@ -102,8 +123,11 @@
   function keepUrlKey(token) {
     if (!KEY_RE.test(token || "")) return;
     window.FAMILY_URL_KEY = token;
-    const next = location.pathname + "?k=" + encodeURIComponent(token) + (location.hash || "");
-    if (location.pathname + location.search + (location.hash || "") !== next) {
+    const next =
+      location.pathname +
+      "?k=" + encodeURIComponent(token) +
+      "#k=" + encodeURIComponent(token);
+    if (location.pathname + location.search + location.hash !== next) {
       history.replaceState({}, "", next);
     }
   }
@@ -114,13 +138,11 @@
     try {
       localStorage.setItem("family.viewKey", token);
     } catch (e) {}
+    writeViewCookie(token);
     try {
       sessionStorage.removeItem("family.claim");
     } catch (e) {}
     writeInstallManifest(token);
-    // iPhone Safari and the home-screen app do not share storage. The icon must
-    // launch with ?k= or it is an empty shell. Keep the key in the URL / manifest
-    // on iPhone Safari so "Add to Home Screen" captures the personal link.
     if (typeof navigator.standalone === "boolean" && !navigator.standalone) {
       keepUrlKey(token);
       return;
@@ -234,6 +256,7 @@
       need = sessionStorage.getItem("family.needInstall") === "1";
     } catch (e) {}
     homeInstall.hidden = !need;
+    if (need && window.FAMILY_VIEW_KEY) keepUrlKey(window.FAMILY_VIEW_KEY);
   }
 
   function goToPersonal() {
@@ -242,7 +265,12 @@
       else sessionStorage.setItem("family.needInstall", "1");
     } catch (e) {}
     if (window.FAMILY_FORCE_INVITE) {
-      location.replace("./");
+      const t = window.FAMILY_VIEW_KEY || "";
+      location.replace(
+        KEY_RE.test(t)
+          ? "./?k=" + encodeURIComponent(t) + "#k=" + encodeURIComponent(t)
+          : "./"
+      );
       return;
     }
     openAlbum();
@@ -251,7 +279,12 @@
 
   function openAlbum() {
     if (window.FAMILY_FORCE_INVITE) {
-      location.replace("./");
+      const t = window.FAMILY_VIEW_KEY || "";
+      location.replace(
+        KEY_RE.test(t)
+          ? "./?k=" + encodeURIComponent(t) + "#k=" + encodeURIComponent(t)
+          : "./"
+      );
       return;
     }
     hideInviteChrome();

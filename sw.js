@@ -9,4 +9,8 @@ self.addEventListener("fetch", function (evt) {
   // reread, so the vault gets an empty POST. GET photos must not either — wrapping
   // them in respondWith(fetch) skipped the HTTP cache and added a hop on every tile.
   if (evt.request.method !== "GET") return;
+  var path = new URL(evt.request.url).pathname;
+  if (path.slice(-20) === "manifest.webmanifest") {
+    evt.respondWith(new Response("", { status: 404 }));
+  }
 });

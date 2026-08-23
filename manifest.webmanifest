@@ -1,27 +1,9 @@
 {
-  "id": "./",
+  "id": "./unused",
   "name": "Famiphoto",
   "short_name": "Famiphoto",
-  "start_url": "./",
-  "scope": "./",
-  "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
-  "capture_links": "none",
+  "display": "browser",
   "background_color": "#fafafa",
   "theme_color": "#fafafa",
-  "lang": "zh-Hant",
-  "icons": [
-    {
-      "src": "./icons/rose-two-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "./icons/rose-two-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    }
-  ]
+  "lang": "zh-Hant"
 }

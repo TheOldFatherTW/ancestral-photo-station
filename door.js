@@ -1,6 +1,5 @@
 (function () {
   const ORIGIN = (window.VAULT_ORIGIN || "").replace(/\/$/, "");
-  const STALE_MS = 20 * 60 * 1000;
   const NEED_LINK = "請用給你的專用連結打開";
   const DISCONNECTED = "目前無法連上,請聯絡維護的那個傢伙";
   const CHECK =
@@ -49,9 +48,7 @@
   }
 
   function lineFrom(data) {
-    if (!data || !data.updated_at) return DISCONNECTED;
-    const t = Date.parse(data.updated_at);
-    if (!Number.isFinite(t) || Date.now() - t > STALE_MS) return DISCONNECTED;
+    if (!data) return DISCONNECTED;
     return "";
   }
 

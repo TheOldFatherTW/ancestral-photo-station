@@ -8,7 +8,6 @@
   const cabs = document.getElementById("cabinets");
   const album = document.getElementById("album");
   const albumTitle = document.getElementById("album-title");
-  const albumCoverBtn = document.getElementById("album-cover-btn");
   const feed = document.getElementById("feed");
   let openPerson = "";
   let names = {};
@@ -21,6 +20,8 @@
   let uploadBusy = false;
   let upBar = null;
   let upHide = 0;
+  let latestPeople = {};
+  let uploadViews = {};
   const UPLOAD_CAP = 480 * 1024 * 1024;
   // Small enough that a phone finishes one before anything between it and the vault
   // gives up, and that the bar moves often, since Safari reports no progress of its own.
@@ -39,6 +40,8 @@
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4l-1.2 16M15.2 4l-1.2 16M4.5 9h15M4 15h15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
   const DOWNLOAD =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 11.5L12 16l4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 19.5h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  const GEAR =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.6 3.8l.6-1.3h3.6l.6 1.3 1.6.7 1.4-.5 2.5 2.5-.5 1.4.7 1.6 1.3.6v3.6l-1.3.6-.7 1.6.5 1.4-2.5 2.5-1.4-.5-1.6.7-.6 1.3h-3.6l-.6-1.3-1.6-.7-1.4.5-2.5-2.5.5-1.4-.7-1.6-1.3-.6v-3.6l1.3-.6.7-1.6-.5-1.4L6.6 4l1.4.5 1.6-.7z" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linejoin="round"/><circle cx="12" cy="11.9" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
 
   function api(path) {
     const url = ORIGIN + path;
@@ -172,6 +175,7 @@
     const board = document.getElementById("tag-board");
     if (board) board.hidden = true;
     showRail(false);
+    showSettings(false);
   }
 
   function showAlbum(person, name) {
@@ -184,9 +188,9 @@
     }
     if (album) album.hidden = false;
     if (!solo && albumTitle) albumTitle.textContent = name || names[person] || person;
-    if (albumCoverBtn) albumCoverBtn.dataset.person = person;
     if (window.FamilyTags) window.FamilyTags.show(person);
     showRail(true);
+    showSettings(true);
     if (openPerson === person) return;
     openPerson = person;
     if (window.FamilyFeed) window.FamilyFeed.start(person);
@@ -208,41 +212,25 @@
     upBar = document.createElement("div");
     upBar.className = "up-bar";
     upBar.hidden = true;
-    const main = document.createElement("div");
-    main.className = "up-main";
-    const meter = document.createElement("div");
-    meter.className = "hp-meter";
-    const track = document.createElement("div");
-    track.className = "hp-track";
-    const fill = document.createElement("div");
-    fill.className = "hp-fill";
-    track.appendChild(fill);
-    const num = document.createElement("span");
-    num.className = "hp-num";
-    meter.appendChild(track);
-    meter.appendChild(num);
+    const status = hpRow("backup");
+    status.classList.add("up-status");
     const sub = document.createElement("div");
     sub.className = "up-sub";
-    upBar.appendChild(main);
-    upBar.appendChild(meter);
+    upBar.appendChild(status);
     upBar.appendChild(sub);
     document.body.appendChild(upBar);
     return upBar;
   }
 
-  function paintUp(main, sub, ratio) {
+  function paintUp(view, sub) {
     const bar = upNode();
     if (upHide) {
       window.clearTimeout(upHide);
       upHide = 0;
     }
     bar.hidden = false;
-    bar.querySelector(".up-main").textContent = main;
+    paintHp(bar.querySelector(".hp"), view);
     bar.querySelector(".up-sub").textContent = sub || "";
-    const pct = ratio == null ? null : Math.max(0, Math.min(100, Math.round(ratio * 100)));
-    bar.querySelector(".hp-meter").hidden = pct == null;
-    bar.querySelector(".hp-fill").style.width = (pct == null ? 0 : pct) + "%";
-    bar.querySelector(".hp-num").textContent = pct == null ? "" : pct + "%";
   }
 
   function closeUp(after) {
@@ -299,6 +287,10 @@
   // A phone that will not sync to iCloud and will not talk to Windows over the cable can
   // still open this page, so hand-picking the stranded pictures is the last way in.
   function pickUpload(person, btn) {
+    if (uploadBusy) {
+      fail("上一批還在傳，傳完再選下一批");
+      return;
+    }
     uploadPerson = person;
     uploadBtn = btn || null;
     openPicker();
@@ -327,7 +319,20 @@
         // Let the strip paint before the sizes get added up, so a big pick does not
         // spend its first moment back from the picker looking just as dead as before.
         if (uploadBtn) uploadBtn.classList.add("is-run");
-        paintUp("讀取 " + picked.length + " 張照片…", "", null);
+        paintUpload(
+          who,
+          {
+            running: true,
+            done: false,
+            percent: 0,
+            doneCount: 0,
+            totalCount: picked.length,
+            busyText: "備份中...",
+            doneText: "備份完成",
+            waitText: "尚未檢查",
+          },
+          ""
+        );
         window.setTimeout(function () {
           sendUploads(who, picked);
         }, 50);
@@ -352,10 +357,24 @@
       else fresh.push(f);
     });
     if (!fresh.length) {
-      paintUp(already ? already + " 張本來就有" : "沒有新的照片", "", 1);
+      paintUpload(
+        person,
+        {
+          running: false,
+          done: true,
+          percent: 100,
+          doneCount: files.length,
+          totalCount: files.length,
+          busyText: "備份中...",
+          doneText: "備份完成",
+          waitText: "尚未檢查",
+        },
+        already ? already + " 張本來就有" : "沒有新的照片"
+      );
       uploadBusy = false;
       if (uploadBtn) uploadBtn.classList.remove("is-run");
       closeUp(20000);
+      clearUploadView(person, 20000);
       return;
     }
     // Grouped by weight rather than count: one pass of holiday videos and one pass of
@@ -387,6 +406,7 @@
       groups.length +
       " 批送。傳完之前請不要鎖螢幕或切到別的 App。";
     let done = 0;
+    let handled = already;
     const why = [];
     function blame(word) {
       if (why.indexOf(word) < 0) why.push(word);
@@ -400,7 +420,20 @@
           body.append("photo", f, f.name || "photo.jpg");
           weight += f.size;
         });
-        paintUp("上傳中 第 " + (i + 1) + " 批／共 " + groups.length + " 批", note, total ? done / total : 0);
+        paintUpload(
+          person,
+          {
+            running: true,
+            done: false,
+            percent: total ? Math.round((done * 100) / total) : 0,
+            doneCount: handled,
+            totalCount: files.length,
+            busyText: "備份中...",
+            doneText: "備份完成",
+            waitText: "尚未檢查",
+          },
+          note
+        );
         try {
           // A plain POST of form data needs no CORS preflight. Asking for byte level
           // progress does, and Safari does not report that progress anyway, so the
@@ -422,6 +455,7 @@
           failed += group.length;
         }
         done += weight;
+        handled += group.length;
       }
       const bits = [];
       if (saved) bits.push("收進來 " + saved + " 張");
@@ -429,7 +463,23 @@
       if (failed) {
         bits.push(failed + " 張傳不上來" + (why.length ? "，" + why.join("、") : ""));
       }
-      paintUp(bits.length ? bits.join("，") : "沒有新的照片", "", 1);
+      const complete = Math.min(files.length, saved + already);
+      paintUpload(
+        person,
+        {
+          running: false,
+          done: failed === 0,
+          error: failed > 0,
+          errorText: "備份未完成",
+          percent: failed ? Math.round((complete * 100) / Math.max(1, files.length)) : 100,
+          doneCount: complete,
+          totalCount: files.length,
+          busyText: "備份中...",
+          doneText: "備份完成",
+          waitText: "尚未檢查",
+        },
+        bits.length ? bits.join("，") : "沒有新的照片"
+      );
       if (saved) {
         delete heldByPerson[person];
         lastCab = "";
@@ -439,13 +489,29 @@
         }
       }
     } catch (err) {
-      paintUp("上傳出錯了：" + (err && err.message ? err.message : "連不上家裡那台"), "", null);
+      paintUpload(
+        person,
+        {
+          running: false,
+          done: false,
+          error: true,
+          errorText: "備份失敗",
+          percent: null,
+          doneCount: 0,
+          totalCount: files.length,
+          busyText: "備份中...",
+          doneText: "備份完成",
+          waitText: "尚未檢查",
+        },
+        err && err.message ? err.message : "連不上家裡那台"
+      );
     } finally {
       uploadBusy = false;
       if (uploadBtn) uploadBtn.classList.remove("is-run");
       // The outcome has to survive long enough to be read, but the strip must not
       // become permanent furniture, so it takes itself away after a spell.
       closeUp(20000);
+      clearUploadView(person, 20000);
     }
   }
 
@@ -465,57 +531,80 @@
     return btn;
   }
 
-  function bindCastTrash(btn) {
-    let hold = 0;
-    let raf = 0;
-    let start = 0;
-    let opened = false;
-    function stopCast() {
-      if (hold) {
-        window.clearTimeout(hold);
-        hold = 0;
-      }
-      if (raf) {
-        window.cancelAnimationFrame(raf);
-        raf = 0;
-      }
-      btn.classList.remove("is-cast");
-      btn.style.removeProperty("--cast");
+  function closeSettings() {
+    const wrap = document.getElementById("album-settings");
+    if (!wrap) return;
+    const menu = wrap.querySelector(".settings-menu");
+    const toggle = wrap.querySelector(".settings-toggle");
+    if (menu) menu.hidden = true;
+    if (toggle) toggle.setAttribute("aria-expanded", "false");
+  }
+
+  function ensureSettings() {
+    let wrap = document.getElementById("album-settings");
+    if (wrap) return wrap;
+    wrap = document.createElement("div");
+    wrap.id = "album-settings";
+    wrap.className = "album-settings";
+    wrap.hidden = true;
+    const toggle = insButton("settings-toggle", GEAR, "設定");
+    toggle.setAttribute("aria-expanded", "false");
+    const menu = document.createElement("div");
+    menu.className = "settings-menu";
+    menu.setAttribute("role", "menu");
+    menu.hidden = true;
+    function entry(svg, label, action) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "settings-entry";
+      btn.setAttribute("role", "menuitem");
+      btn.innerHTML = svg + "<span>" + label + "</span>";
+      btn.addEventListener("click", function () {
+        closeSettings();
+        action();
+      });
+      return btn;
     }
-    function tick() {
-      const t = Math.min(1, (Date.now() - start) / 2000);
-      btn.style.setProperty("--cast", 360 * t + "deg");
-      if (t < 1 && hold) raf = window.requestAnimationFrame(tick);
-    }
-    btn.addEventListener("pointerdown", function (ev) {
-      if (ev.button && ev.button !== 0) return;
-      ev.preventDefault();
-      opened = false;
-      stopCast();
-      btn.classList.add("is-cast");
-      start = Date.now();
-      raf = window.requestAnimationFrame(tick);
-      try {
-        btn.setPointerCapture(ev.pointerId);
-      } catch (e) {}
-      hold = window.setTimeout(function () {
-        hold = 0;
-        opened = true;
-        stopCast();
+    menu.appendChild(
+      entry(CAMERA, "換封面", function () {
+        if (openPerson) pickCover(openPerson);
+      })
+    );
+    menu.appendChild(
+      entry(TRASH, "開啟垃圾桶", function () {
         if (window.FamilyFeed) window.FamilyFeed.openTrash();
-      }, 2000);
+      })
+    );
+    toggle.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const open = menu.hidden;
+      menu.hidden = !open;
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
     });
-    function endCast() {
-      if (opened) return;
-      const held = Date.now() - start;
-      stopCast();
-      if (held >= 2000) return;
-      if (held < 450 && window.FamilyFeed) window.FamilyFeed.trashSelected();
-    }
-    btn.addEventListener("pointerup", endCast);
-    btn.addEventListener("pointercancel", function () {
-      opened = false;
-      stopCast();
+    wrap.appendChild(toggle);
+    wrap.appendChild(menu);
+    document.body.appendChild(wrap);
+    document.addEventListener("pointerdown", function (ev) {
+      if (!wrap.contains(ev.target)) closeSettings();
+    });
+    document.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape") closeSettings();
+    });
+    return wrap;
+  }
+
+  function showSettings(on) {
+    const wrap = ensureSettings();
+    wrap.hidden = !on;
+    if (!on) closeSettings();
+  }
+
+  function bindCastTrash(btn) {
+    btn.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (window.FamilyFeed) window.FamilyFeed.trashSelected();
     });
   }
 
@@ -558,12 +647,6 @@
     cover.appendChild(work);
     a.appendChild(cover);
     wrap.appendChild(a);
-    const pick = insButton("cab-pick", CAMERA, p.has_cover ? "換封面" : "選封面");
-    pick.addEventListener("click", function (ev) {
-      ev.preventDefault();
-      ev.stopPropagation();
-      pickCover(p.id);
-    });
     const refresh = insButton("cab-refresh", REFRESH, "檢查並備份");
     refresh.addEventListener("click", function (ev) {
       ev.preventDefault();
@@ -584,7 +667,6 @@
     actions.className = "cab-actions";
     actions.appendChild(refresh);
     actions.appendChild(send);
-    actions.appendChild(pick);
     const side = document.createElement("div");
     side.className = "cab-side";
     side.appendChild(bars);
@@ -603,6 +685,10 @@
     label.className = "hp-label";
     const text = document.createElement("span");
     text.className = "hp-text";
+    const alt = document.createElement("span");
+    alt.className = "hp-alt";
+    alt.hidden = true;
+    alt.innerHTML = '<span class="hp-alt-pct"></span><span class="hp-alt-count"></span>';
     const mark = document.createElement("span");
     mark.className = "hp-check";
     mark.hidden = true;
@@ -613,6 +699,7 @@
     think.innerHTML = "<span></span><span></span><span></span><span></span><span></span>";
     think.hidden = true;
     label.appendChild(text);
+    label.appendChild(alt);
     label.appendChild(think);
     label.appendChild(mark);
     const meter = document.createElement("div");
@@ -631,8 +718,32 @@
     return row;
   }
 
+  function setUploadView(person, view) {
+    uploadViews[person] = view;
+    const p = latestPeople[person];
+    const hud = cabs && cabs.querySelector('.cab-hud[data-person="' + person + '"]');
+    if (p && hud) fillHud(hud, p);
+  }
+
+  function paintUpload(person, view, sub) {
+    setUploadView(person, view);
+    paintUp(view, sub);
+  }
+
+  function clearUploadView(person, after) {
+    const view = uploadViews[person];
+    window.setTimeout(function () {
+      if (uploadViews[person] !== view) return;
+      delete uploadViews[person];
+      const p = latestPeople[person];
+      const hud = cabs && cabs.querySelector('.cab-hud[data-person="' + person + '"]');
+      if (p && hud) fillHud(hud, p);
+    }, after);
+  }
+
   function fillHud(hud, p) {
     const id = p.id;
+    const local = uploadViews[id] || null;
     const backupRun = p.sync === "running";
     if (backupRun) backupAsk[id] = false;
     if (!backupRun && (p.sync === "synced" || p.percent === 100)) {
@@ -644,13 +755,22 @@
     try {
       remembered = localStorage.getItem("family.backupDone." + id) === "1";
     } catch (e) {}
-    const showRun = backupRun || !!backupAsk[id];
-    const backupDone = !showRun && (remembered || p.sync === "synced" || p.percent === 100);
+    const showRun = !!(local && local.running) || backupRun || !!backupAsk[id];
+    const shownLocal = local && (local.running || !showRun) ? local : null;
+    const backupDone =
+      !showRun &&
+      (shownLocal
+        ? !!shownLocal.done
+        : remembered || p.sync === "synced" || p.percent === 100);
     paintHp(hud.querySelector('.hp[data-kind="backup"]'), {
       running: showRun,
       done: backupDone,
-      percent: p.percent,
-      busyText: "自動備份中…",
+      error: !!(shownLocal && shownLocal.error),
+      errorText: shownLocal && shownLocal.errorText,
+      percent: shownLocal && shownLocal.percent != null ? shownLocal.percent : p.percent,
+      doneCount: shownLocal ? shownLocal.doneCount : p.backup_done,
+      totalCount: shownLocal ? shownLocal.totalCount : p.backup_total,
+      busyText: "備份中...",
       doneText: "備份完成",
       waitText: "尚未檢查",
     });
@@ -682,30 +802,49 @@
   function paintHp(row, view) {
     if (!row) return;
     const text = row.querySelector(".hp-text");
+    const alt = row.querySelector(".hp-alt");
     const mark = row.querySelector(".hp-check");
     const fill = row.querySelector(".hp-fill");
     const num = row.querySelector(".hp-num");
     const pct = view.percent == null ? null : Number(view.percent);
     const shown = Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : null;
     if (text) {
-      text.textContent = view.running
-        ? view.busyText
-        : view.done
-          ? view.doneText
-          : view.waitText;
+      text.textContent = view.error
+        ? view.errorText || "備份失敗"
+        : view.running
+          ? view.busyText
+          : view.done
+            ? view.doneText
+            : view.waitText;
+    }
+    if (alt) {
+      const doneCount = Number(view.doneCount);
+      const totalCount = Number(view.totalCount);
+      const hasCount =
+        view.running &&
+        Number.isFinite(doneCount) &&
+        Number.isFinite(totalCount) &&
+        totalCount > 0;
+      const hasPercent = view.running && shown != null;
+      alt.querySelector(".hp-alt-pct").textContent = hasPercent ? Math.round(shown) + "%" : "";
+      alt.querySelector(".hp-alt-count").textContent = hasCount
+        ? Math.max(0, Math.round(doneCount)) + "/" + Math.round(totalCount)
+        : "";
+      alt.hidden = !hasPercent && !hasCount;
+      alt.classList.toggle("has-two", hasPercent && hasCount);
+      alt.classList.toggle("count-only", !hasPercent && hasCount);
     }
     if (mark) mark.hidden = !view.done;
     const think = row.querySelector(".hp-think");
     if (think) think.hidden = !view.running;
     if (fill) fill.style.width = (view.done ? 100 : shown == null ? (view.running ? 42 : 0) : shown) + "%";
     if (num) {
-      if (view.done) num.textContent = "";
-      else if (shown == null) num.textContent = view.running ? "…" : "";
-      else num.textContent = shown + "%";
+      num.textContent = "";
     }
     row.classList.toggle("is-run", !!view.running);
     row.classList.toggle("is-wait", !!view.running && shown == null);
     row.classList.toggle("is-done", !!view.done);
+    row.classList.toggle("is-error", !!view.error);
   }
 
   function paintHud(people) {
@@ -737,7 +876,9 @@
         running: true,
         done: false,
         percent: null,
-        busyText: "自動備份中…",
+        doneCount: 0,
+        totalCount: 0,
+        busyText: "備份中...",
         doneText: "備份完成",
         waitText: "尚未檢查",
       });
@@ -756,8 +897,12 @@
         boot();
       })
       .catch(function () {
+        backupAsk[person] = false;
         fail("現在同步不了，請聯絡維護的那個傢伙");
         if (btn) btn.classList.remove("is-run");
+        const p = latestPeople[person];
+        const hud = cabs && cabs.querySelector('.cab-hud[data-person="' + person + '"]');
+        if (p && hud) fillHud(hud, p);
       });
   }
 
@@ -795,8 +940,10 @@
       if (statusEl) statusEl.textContent = lineFrom(pub);
       const cab = await readJson("/api/cabinets");
       names = {};
+      latestPeople = {};
       (cab.people || []).forEach(function (p) {
         names[p.id] = p.display_name;
+        latestPeople[p.id] = p;
       });
       const stamp = cardStamp(cab.people);
       if (cabs && stamp !== lastCab) {
@@ -861,9 +1008,9 @@
       ev.preventDefault();
       ev.stopPropagation();
       if (!window.FamilyFeed || !window.FamilyFeed.prepareAction()) return;
-      const label = window.prompt("要加上的標記名稱");
-      if (!label) return;
-      window.FamilyFeed.tagSelected(label);
+      if (window.FamilyTags && window.FamilyTags.openBatch) {
+        window.FamilyTags.openBatch();
+      }
     });
     const trash = insButton("rail-trash", TRASH, "丟進垃圾桶");
     bindCastTrash(trash);
@@ -879,29 +1026,6 @@
     return rail;
   }
 
-  if (albumCoverBtn) {
-    albumCoverBtn.innerHTML = CAMERA;
-    albumCoverBtn.addEventListener("click", function () {
-      const person = albumCoverBtn.dataset.person || openPerson;
-      if (person) pickCover(person);
-    });
-  }
-  (function albumTools() {
-    const head = document.querySelector(".album-head");
-    if (!head) return;
-    let tools = document.getElementById("album-tools");
-    if (!tools) {
-      tools = document.createElement("div");
-      tools.id = "album-tools";
-      tools.className = "album-tools";
-      if (albumCoverBtn && albumCoverBtn.parentNode === head) {
-        head.appendChild(tools);
-        tools.appendChild(albumCoverBtn);
-      } else {
-        head.appendChild(tools);
-      }
-    }
-  })();
   window.FamilyDoor = {
     boot: function () {
       boot();

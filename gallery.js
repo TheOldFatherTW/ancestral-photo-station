@@ -20,6 +20,7 @@
   let afterThumbs = function () {};
   let currentPerson = "";
   let currentTags = [];
+  let beforeTrashTags = [];
   let trashMode = false;
   let selecting = false;
   let picked = {};
@@ -200,6 +201,24 @@
 
   function itemKey(item) {
     return item.person + "|" + item.bucket + "|" + item.rel;
+  }
+
+  function normalizedTags(tagIds) {
+    const seen = {};
+    return (tagIds || [])
+      .map(function (id) {
+        return String(id || "");
+      })
+      .filter(function (id) {
+        if (!id || seen[id]) return false;
+        seen[id] = true;
+        return true;
+      })
+      .sort();
+  }
+
+  function tagKey(tagIds) {
+    return normalizedTags(tagIds).join(",");
   }
 
   function pickCount() {
@@ -752,6 +771,7 @@
       }
       const slide = lightbox._slides[lightbox.pswp.currIndex];
       if (window.FamilyTags && slide && slide.familyItem) {
+        if (window.FamilyTags.beforePhotoChange) window.FamilyTags.beforePhotoChange();
         window.FamilyTags.showPhoto(slide.familyItem);
       }
       tellSelect();
@@ -766,6 +786,7 @@
       const sentinel = document.getElementById("feed-sentinel");
       const hint = document.getElementById("feed-hint");
       if (!feed || !person) return;
+      tagIds = normalizedTags(tagIds);
       const my = ++run;
       let offset = 0;
       let total = 0;
@@ -780,9 +801,9 @@
       dropBlobs();
       feed.innerHTML = "";
       feed.dataset.person = person;
-      feed.dataset.tags = (tagIds || []).join(",");
+      feed.dataset.tags = tagIds.join(",");
       currentPerson = person;
-      currentTags = tagIds || [];
+      currentTags = tagIds;
       trashMode = !!(opts && opts.trash);
       feed.dataset.trash = trashMode ? "1" : "";
       feed.classList.toggle("is-trash", trashMode);
@@ -977,7 +998,10 @@
     },
     filter: function (tagIds) {
       const person = (document.getElementById("feed") || {}).dataset.person;
-      if (person) window.FamilyFeed.start(person, tagIds || []);
+      const next = normalizedTags(tagIds);
+      if (!person || trashMode) return;
+      if (person === currentPerson && tagKey(next) === tagKey(currentTags)) return;
+      window.FamilyFeed.start(person, next);
     },
     refresh: function () {
       if (!currentPerson) return;
@@ -1029,25 +1053,52 @@
       );
       });
     },
-    tagSelected: function (label) {
+    tagSelected: function (choices) {
       const rows = targetRows();
-      const name = String(label || "").trim().replace(/^#/, "");
-      if (!rows.length || !name) return Promise.resolve();
-      // A tag does not change how the grid looks, so nothing needs reloading.
-      clearSelect();
-      window.FamilyBusy.start("正在加上 #" + name + "…");
+      const list = Array.isArray(choices) ? choices : [choices];
+      const ids = [];
+      let fresh = "";
+      const labels = [];
+      list.forEach(function (choice) {
+        if (choice && typeof choice === "object" && choice.id) {
+          if (ids.indexOf(choice.id) < 0) ids.push(choice.id);
+          labels.push(choice.label || choice.id);
+          return;
+        }
+        const name = String(
+          choice && typeof choice === "object" ? choice.label || "" : choice || ""
+        )
+          .trim()
+          .replace(/^#/, "");
+        if (!name) return;
+        if (!fresh) fresh = name;
+        labels.push(name);
+      });
+      if (!rows.length || (!ids.length && !fresh)) return Promise.resolve();
+      const count = ids.length + (fresh ? 1 : 0);
+      window.FamilyBusy.start(count > 1 ? "正在加上 " + count + " 個標籤…" : "正在加上 #" + labels[0] + "…");
       return tagPost({
         action: "attach_many",
         person: currentPerson,
+        ids: ids,
         kind: "custom",
-        label: name,
+        label: fresh,
         photos: rows,
       }).then(
-        function () {
-          window.FamilyBusy.done("已加上 #" + name);
+        function (payload) {
+          clearSelect();
+          if (window.FamilyTags && window.FamilyTags.accept) {
+            window.FamilyTags.accept(payload);
+          }
+          if (window.FamilyTags && window.FamilyTags.refreshPhoto) {
+            window.FamilyTags.refreshPhoto();
+          }
+          window.FamilyBusy.done(count > 1 ? "已加上 " + count + " 個標籤" : "已加上 #" + labels[0]);
+          return payload;
         },
         function () {
           window.FamilyBusy.done("加不上，請再試一次");
+          return null;
         }
       );
     },
@@ -1059,11 +1110,14 @@
       if (!currentPerson) return;
       if (lightbox && lightbox.pswp) lightbox.pswp.close();
       clearSelect();
+      beforeTrashTags = currentTags.slice();
       window.FamilyFeed.start(currentPerson, [], { trash: true });
     },
     closeTrash: function () {
       if (!currentPerson) return;
-      window.FamilyFeed.start(currentPerson, []);
+      const tags = beforeTrashTags.slice();
+      beforeTrashTags = [];
+      window.FamilyFeed.start(currentPerson, tags);
     },
     pswp: function () {
       return lightbox && lightbox.pswp;
@@ -1074,6 +1128,7 @@
       afterThumbs = function () {};
       currentPerson = "";
       trashMode = false;
+      beforeTrashTags = [];
       clearSelect();
       dropBlobs();
       if (window.thumbObserver) window.thumbObserver.disconnect();

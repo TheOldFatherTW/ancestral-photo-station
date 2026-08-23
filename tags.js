@@ -15,6 +15,9 @@
   let faceCtrl = null;
   let faceCube = null;
   let selectedTag = null;
+  let pickerRefresh = function () {};
+  let batchSheet = null;
+  let lastLoadAt = 0;
 
   function api(path, opts) {
     const origin = (window.VAULT_ORIGIN || "").replace(/\/$/, "");
@@ -35,16 +38,235 @@
     });
   }
 
+  function allTags() {
+    const seen = {};
+    const out = [];
+    (lastBoard.groups || []).forEach(function (group) {
+      (group.tags || []).forEach(function (tag) {
+        if (!tag || !tag.id || seen[tag.id]) return;
+        seen[tag.id] = true;
+        out.push(tag);
+      });
+    });
+    return out;
+  }
+
+  function tagById(id) {
+    const rows = allTags();
+    for (let i = 0; i < rows.length; i += 1) {
+      if (rows[i].id === id) return rows[i];
+    }
+    return null;
+  }
+
+  function tagPool(opts) {
+    opts = opts || {};
+    return allTags().filter(function (tag) {
+      if (opts.kind && tag.kind !== opts.kind) return false;
+      if (opts.exceptId && tag.id === opts.exceptId) return false;
+      if (opts.exceptIds && opts.exceptIds[tag.id]) return false;
+      if (opts.customPeople && tag.kind === "person" && tag.auto) return false;
+      return true;
+    });
+  }
+
+  function recommendations(opts) {
+    opts = opts || {};
+    const pool = tagPool(opts).filter(function (tag) {
+      return !(
+        opts.hideAutoPeople &&
+        tag.kind === "person" &&
+        tag.auto &&
+        /^p\d+$/i.test(String(tag.label || ""))
+      );
+    });
+    const recent = pool
+      .filter(function (tag) {
+        return Number(tag.used_at) > 0;
+      })
+      .sort(function (a, b) {
+        return Number(b.used_at) - Number(a.used_at) || Number(b.count) - Number(a.count);
+      });
+    const popular = pool.slice().sort(function (a, b) {
+      return (
+        Number(b.count) - Number(a.count) ||
+        Number(b.used_at) - Number(a.used_at) ||
+        String(a.label || "").localeCompare(String(b.label || ""), "zh-Hant")
+      );
+    });
+    const out = [];
+    const seen = {};
+    recent.slice(0, 4).concat(popular).forEach(function (tag) {
+      if (out.length >= 8 || seen[tag.id]) return;
+      seen[tag.id] = true;
+      out.push(tag);
+    });
+    return out;
+  }
+
+  function catalogOf(query, opts) {
+    const q = String(query || "").trim().replace(/^#/, "").toLowerCase();
+    if (!q) return recommendations(opts);
+    return tagPool(opts)
+      .filter(function (tag) {
+        return String(tag.label || "").toLowerCase().indexOf(q) >= 0;
+      })
+      .sort(function (a, b) {
+        const al = String(a.label || "").toLowerCase();
+        const bl = String(b.label || "").toLowerCase();
+        return (
+          Number(bl === q) - Number(al === q) ||
+          Number(bl.indexOf(q) === 0) - Number(al.indexOf(q) === 0) ||
+          Number(b.count) - Number(a.count) ||
+          Number(b.used_at) - Number(a.used_at)
+        );
+      })
+      .slice(0, 8);
+  }
+
+  function tagInput(placeholder) {
+    const input = document.createElement("input");
+    input.type = "search";
+    input.name = "search";
+    input.maxLength = 48;
+    input.placeholder = placeholder || "搜尋標籤";
+    input.autocomplete = "off";
+    input.autocapitalize = "none";
+    input.setAttribute("autocorrect", "off");
+    input.spellcheck = false;
+    input.setAttribute("enterkeyhint", "done");
+    input.className = "tag-search-input";
+    return input;
+  }
+
+  function tagChip(tag, on, choose) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "tag-chip" + (on ? " is-on" : "");
+    chip.dataset.tagId = tag.id;
+    chip.textContent = "#" + tag.label;
+    chip.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      choose(tag);
+    });
+    return chip;
+  }
+
+  function renderSuggestions(host, query, opts, choose) {
+    host.innerHTML = "";
+    const hits = catalogOf(query, opts);
+    if (!hits.length) return;
+    const title = document.createElement("p");
+    title.className = "tag-suggest-title";
+    title.textContent = opts && opts.kind === "person" ? "建議的人物" : "建議的標籤";
+    host.appendChild(title);
+    hits.forEach(function (tag) {
+      host.appendChild(tagChip(tag, false, choose));
+    });
+  }
+
+  function createPicker(opts) {
+    const root = document.createElement("div");
+    root.className = "tag-picker";
+    const chosen = document.createElement("div");
+    chosen.className = "tag-picker-chosen";
+    const form = document.createElement("form");
+    form.className = "tag-picker-form";
+    form.autocomplete = "off";
+    const input = tagInput("搜尋標籤");
+    const go = document.createElement("button");
+    go.type = "submit";
+    go.className = "mode-btn mode-pick";
+    go.textContent = opts.actionText;
+    const suggest = document.createElement("div");
+    suggest.className = "tag-picker-suggest";
+    form.appendChild(input);
+    form.appendChild(go);
+    root.appendChild(chosen);
+    root.appendChild(form);
+    root.appendChild(suggest);
+
+    function ids() {
+      return opts.ids;
+    }
+
+    function toggle(tag, keepFocus) {
+      const at = ids().indexOf(tag.id);
+      if (at >= 0) ids().splice(at, 1);
+      else ids().push(tag.id);
+      input.value = "";
+      if (keepFocus) {
+        try {
+          input.focus({ preventScroll: true });
+        } catch (e) {
+          input.focus();
+        }
+      }
+      refresh();
+      if (opts.onChange) opts.onChange(ids().slice());
+    }
+
+    function refresh() {
+      chosen.innerHTML = "";
+      chosen.hidden = !ids().length;
+      ids().forEach(function (id) {
+        const tag = tagById(id);
+        if (tag) {
+          chosen.appendChild(
+            tagChip(tag, true, function (picked) {
+              toggle(picked, false);
+            })
+          );
+        }
+      });
+      const exceptIds = {};
+      ids().forEach(function (id) {
+        exceptIds[id] = true;
+      });
+      if (document.activeElement === input || input.value) {
+        renderSuggestions(
+          suggest,
+          input.value,
+          { exceptIds: exceptIds, hideAutoPeople: !input.value },
+          function (picked) {
+            toggle(picked, true);
+          }
+        );
+      } else {
+        suggest.innerHTML = "";
+      }
+      board.querySelectorAll(".tag-row .tag-chip").forEach(function (chip) {
+        chip.classList.toggle("is-on", ids().indexOf(chip.dataset.tagId) >= 0);
+      });
+    }
+
+    input.addEventListener("focus", refresh);
+    input.addEventListener("input", refresh);
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      const label = String(input.value || "").trim().replace(/^#/, "");
+      const exact = catalogOf(label, {}).filter(function (tag) {
+        return String(tag.label || "").toLowerCase() === label.toLowerCase();
+      })[0];
+      if (exact && ids().indexOf(exact.id) < 0) ids().push(exact.id);
+      const choices = ids()
+        .map(tagById)
+        .filter(Boolean);
+      const fresh = opts.allowNew && label && !exact ? label : "";
+      opts.onSubmit(choices, fresh);
+    });
+    refresh();
+    return { node: root, refresh: refresh, input: input };
+  }
+
   function modeBtn(id, label) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "mode-btn" + (mode === id ? " is-on" : "");
     btn.textContent = label;
     btn.addEventListener("click", function () {
+      if (mode === id) return;
       mode = id;
-      if (id === "basic") {
-        if (window.FamilyFeed) window.FamilyFeed.filter([]);
-      }
       paint(lastBoard);
     });
     return btn;
@@ -53,23 +275,29 @@
   function paint(data) {
     if (!board) return;
     lastBoard = data || lastBoard;
+    selected = selected.filter(function (id) {
+      return !!tagById(id);
+    });
     board.hidden = false;
     board.innerHTML = "";
     const bar = document.createElement("div");
     bar.className = "mode-bar";
     bar.appendChild(modeBtn("basic", "Basic mode"));
     bar.appendChild(modeBtn("hashtag", "Hashtag mode"));
-    const pick = document.createElement("button");
-    pick.type = "button";
-    pick.className = "mode-btn mode-pick";
-    pick.textContent = "Pick";
-    pick.disabled = mode !== "hashtag";
-    pick.addEventListener("click", function () {
-      if (mode !== "hashtag") return;
-      if (window.FamilyFeed) window.FamilyFeed.filter(selected.slice());
-    });
-    bar.appendChild(pick);
     board.appendChild(bar);
+    const picker = createPicker({
+      ids: selected,
+      actionText: "Pick",
+      allowNew: false,
+      onSubmit: function (choices) {
+        const ids = choices.map(function (tag) {
+          return tag.id;
+        });
+        if (window.FamilyFeed) window.FamilyFeed.filter(ids);
+      },
+    });
+    pickerRefresh = picker.refresh;
+    board.appendChild(picker.node);
     if (mode !== "hashtag") return;
     (lastBoard.groups || []).forEach(function (group) {
       if (!group.tags || !group.tags.length) return;
@@ -89,17 +317,14 @@
         const row = document.createElement("div");
         row.className = "tag-row";
         group.tags.forEach(function (tag) {
-          const chip = document.createElement("button");
-          chip.type = "button";
-          chip.className = "tag-chip" + (selected.indexOf(tag.id) >= 0 ? " is-on" : "");
-          chip.textContent = "#" + tag.label;
-          chip.addEventListener("click", function () {
-            const at = selected.indexOf(tag.id);
-            if (at >= 0) selected.splice(at, 1);
-            else selected.push(tag.id);
-            paint(lastBoard);
-          });
-          row.appendChild(chip);
+          row.appendChild(
+            tagChip(tag, selected.indexOf(tag.id) >= 0, function (picked) {
+              const at = selected.indexOf(picked.id);
+              if (at >= 0) selected.splice(at, 1);
+              else selected.push(picked.id);
+              pickerRefresh();
+            })
+          );
         });
         wrap.appendChild(row);
       }
@@ -109,12 +334,78 @@
 
   function load() {
     if (!person) return;
+    lastLoadAt = Date.now();
     api("/api/tags?person=" + encodeURIComponent(person))
       .then(function (res) {
         return res.json();
       })
-      .then(paint)
+      .then(function (data) {
+        const active = document.activeElement;
+        if (
+          batchSheet ||
+          (active && active.classList && active.classList.contains("tag-search-input"))
+        ) {
+          lastBoard = data || lastBoard;
+          return;
+        }
+        paint(data);
+      })
       .catch(function () {});
+  }
+
+  function accept(payload) {
+    if (payload && payload.groups) paint(payload);
+    return payload;
+  }
+
+  function closeBatch() {
+    if (batchSheet) batchSheet.remove();
+    batchSheet = null;
+    document.documentElement.classList.remove("tag-modal-open");
+  }
+
+  function openBatch() {
+    closeBatch();
+    const mask = document.createElement("div");
+    mask.className = "batch-tag-mask";
+    const card = document.createElement("div");
+    card.className = "batch-tag-sheet";
+    const head = document.createElement("div");
+    head.className = "batch-tag-head";
+    const title = document.createElement("p");
+    title.textContent = "加上標籤";
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "batch-tag-close";
+    close.setAttribute("aria-label", "關閉");
+    close.textContent = "×";
+    close.addEventListener("click", closeBatch);
+    head.appendChild(title);
+    head.appendChild(close);
+    const ids = [];
+    const picker = createPicker({
+      ids: ids,
+      actionText: "加上",
+      allowNew: true,
+      onSubmit: function (choices, fresh) {
+        const picks = choices.slice();
+        if (fresh) picks.push({ label: fresh });
+        if (!picks.length || !window.FamilyFeed) return;
+        window.FamilyFeed.tagSelected(picks).then(function (payload) {
+          if (payload) closeBatch();
+        });
+      },
+    });
+    card.appendChild(head);
+    card.appendChild(picker.node);
+    mask.appendChild(card);
+    mask.addEventListener("click", function (ev) {
+      if (ev.target === mask) closeBatch();
+    });
+    document.body.appendChild(mask);
+    batchSheet = mask;
+    document.documentElement.classList.add("tag-modal-open");
+    picker.input.focus();
   }
 
   function ensureSheet() {
@@ -136,24 +427,6 @@
     const node = ensureSheet();
     if (host && node.parentNode !== host) host.appendChild(node);
     return node;
-  }
-
-  function catalogOf(query, opts) {
-    const q = String(query || "").trim().toLowerCase();
-    if (!q) return [];
-    opts = opts || {};
-    const hits = [];
-    (lastBoard.groups || []).forEach(function (group) {
-      (group.tags || []).forEach(function (tag) {
-        if (!tag) return;
-        if (opts.kind && tag.kind !== opts.kind) return;
-        if (opts.exceptId && tag.id === opts.exceptId) return;
-        if (opts.exceptIds && opts.exceptIds[tag.id]) return;
-        if (String(tag.label || "").toLowerCase().indexOf(q) < 0) return;
-        hits.push(tag);
-      });
-    });
-    return hits.slice(0, 8);
   }
 
   function faceCubeOn() {
@@ -209,8 +482,8 @@
     return node;
   }
 
-  function afterChange(payload) {
-    paintSheet(payload);
+  function afterChange(payload, item) {
+    if (item && stillOn(item)) paintSheet(payload);
     // The write already answers with the whole board, so fetching it again
     // only doubled the wait after every tap.
     if (payload && payload.groups) paint(payload);
@@ -218,11 +491,12 @@
   }
 
   function runChange(body, working, said) {
+    const item = sheetItem;
     window.FamilyBusy.start(working);
-    return photoPost(body).then(
+    return photoPost(body, item).then(
       function (payload) {
         window.FamilyBusy.done(said);
-        afterChange(payload);
+        afterChange(payload, item);
         return payload;
       },
       function () {
@@ -235,6 +509,7 @@
   function paintSheet(data, keepFaces) {
     if (data && data.groups) lastBoard.groups = data.groups;
     const node = hostSheet();
+    node.classList.remove("is-searching");
     node.innerHTML = "";
     const title = document.createElement("p");
     title.className = "pswp-tag-title";
@@ -267,17 +542,14 @@
       return null;
     }
     const form = document.createElement("form");
-    form.className = "pswp-tag-add";
-    const input = document.createElement("input");
-    input.type = "text";
-    input.maxLength = 48;
-    input.placeholder = "輸入標記名稱";
-    input.setAttribute("enterkeyhint", "done");
+    form.className = "pswp-tag-add tag-picker-form";
+    form.autocomplete = "off";
+    const input = tagInput("搜尋標籤");
     const go = document.createElement("button");
     go.type = "submit";
     go.textContent = "新增";
     const suggest = document.createElement("div");
-    suggest.className = "pswp-tag-suggest";
+    suggest.className = "pswp-tag-suggest tag-picker-suggest";
 
     function ghostChip(label) {
       const empty = row.querySelector(".pswp-tag-empty");
@@ -340,23 +612,29 @@
     function matches() {
       const q = input.value;
       const target = renameTarget();
-      if (target) return catalogOf(q, { kind: target.kind, exceptId: target.id });
-      return catalogOf(q, { exceptIds: onPhoto });
+      if (target) {
+        return catalogOf(q, {
+          kind: target.kind,
+          exceptId: target.id,
+          customPeople: target.kind === "person",
+        });
+      }
+      return catalogOf(q, { exceptIds: onPhoto, hideAutoPeople: !q });
     }
 
     function renderSuggest() {
-      suggest.innerHTML = "";
-      const hits = matches();
-      if (!hits.length) return;
-      const hint = document.createElement("p");
-      hint.className = "pswp-tag-suggest-hint";
-      hint.textContent = "點一下才會加上，光輸入不會存檔";
-      suggest.appendChild(hint);
-      hits.forEach(function (hit) {
-        const pick = document.createElement("button");
-        pick.type = "button";
-        pick.textContent = "#" + hit.label;
-        pick.addEventListener("click", function () {
+      const target = renameTarget();
+      renderSuggestions(
+        suggest,
+        input.value,
+        target
+          ? {
+              kind: target.kind,
+              exceptId: target.id,
+              customPeople: target.kind === "person",
+            }
+          : { exceptIds: onPhoto, hideAutoPeople: !input.value },
+        function (hit) {
           const target = renameTarget();
           if (target) {
             askMerge(target, hit);
@@ -368,9 +646,8 @@
             "正在加上 #" + hit.label + "…",
             "已加上 #" + hit.label
           );
-        });
-        suggest.appendChild(pick);
-      });
+        }
+      );
     }
 
     function exitRename() {
@@ -383,10 +660,28 @@
     function enterRename(tag) {
       renaming = tag;
       go.textContent = "改名";
-      input.value = tag.label;
+      input.value =
+        tag.kind === "person" && tag.auto && /^p\d+$/i.test(String(tag.label || ""))
+          ? ""
+          : tag.label;
       renderSuggest();
       input.focus();
-      input.select();
+      if (input.value) input.select();
+    }
+
+    function enterSearch() {
+      node.classList.add("is-searching");
+      const target = renameTarget();
+      title.textContent = target && target.kind === "person" ? "建議的人物" : "建議的標籤";
+      renderSuggest();
+    }
+
+    function leaveSearch() {
+      window.setTimeout(function () {
+        if (node.contains(document.activeElement)) return;
+        node.classList.remove("is-searching");
+        title.textContent = sheetItem && sheetItem.kind === "video" ? "這支的標記" : "這張的標記";
+      }, 0);
     }
 
     tags.forEach(function (tag) {
@@ -439,13 +734,13 @@
       const byAdd = addClick;
       addClick = false;
       if (!byAdd) return;
-      const label = (input.value || "").trim();
+      const label = (input.value || "").trim().replace(/^#/, "");
       if (!label) return;
       const target = renameTarget();
       if (target) {
         const was = target.label;
         const exact = matches().filter(function (hit) {
-          return String(hit.label) === label;
+          return String(hit.label || "").toLowerCase() === label.toLowerCase();
         });
         if (exact.length === 1) {
           askMerge(target, exact[0]);
@@ -459,7 +754,7 @@
         return;
       }
       const exact = matches().filter(function (hit) {
-        return String(hit.label) === label;
+        return String(hit.label || "").toLowerCase() === label.toLowerCase();
       });
       ghostChip(label);
       if (exact.length === 1) {
@@ -476,6 +771,8 @@
         "已新增 #" + label
       );
     });
+    input.addEventListener("focus", enterSearch);
+    input.addEventListener("blur", leaveSearch);
     input.addEventListener("input", renderSuggest);
     input.addEventListener("keydown", function (ev) {
       if (ev.key === "Escape" && renaming) {
@@ -697,8 +994,8 @@
     );
   }
 
-  function photoPost(body) {
-    const item = sheetItem;
+  function photoPost(body, item) {
+    item = item || sheetItem;
     if (!item) return Promise.resolve({});
     return post(
       Object.assign(
@@ -713,7 +1010,12 @@
   }
 
   function stillOn(item) {
-    return !!sheetItem && sheetItem.rel === item.rel && sheetItem.bucket === item.bucket;
+    return (
+      !!sheetItem &&
+      sheetItem.person === item.person &&
+      sheetItem.rel === item.rel &&
+      sheetItem.bucket === item.bucket
+    );
   }
 
   function loadPhoto(item) {
@@ -722,6 +1024,8 @@
     faceBoxes = [];
     if (faceLayer) faceLayer.innerHTML = "";
     const node = hostSheet();
+    node.classList.remove("is-searching");
+    node.innerHTML = "";
     node.hidden = false;
     node.classList.toggle("is-video", item.kind === "video");
     hostFaceCube();
@@ -761,35 +1065,72 @@
     clearFaces();
   }
 
+  function beforePhotoChange() {
+    const active = document.activeElement;
+    if (sheet && active && sheet.contains(active) && active.blur) active.blur();
+    if (sheet) sheet.classList.remove("is-searching");
+  }
+
+  function refreshPhoto() {
+    if (sheetItem) loadPhoto(sheetItem);
+  }
+
   // iOS does not shrink the layout viewport for the on-screen keyboard, so a sheet
   // pinned to bottom:0 ends up underneath it. visualViewport is the only thing that
   // knows how much of the window the keyboard is actually covering.
   (function watchKeyboard() {
     const vv = window.visualViewport;
     if (!vv) return;
+    let keyboardUp = false;
+    let lastLift = -1;
+    let revealTimer = 0;
+    let closeTimer = 0;
     function sync() {
-      const lift = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      const up = lift > 80;
-      document.documentElement.style.setProperty("--kb", Math.round(lift) + "px");
-      document.documentElement.classList.toggle("kb-up", up);
-      if (up && sheet) {
-        window.requestAnimationFrame(function () {
-          const focused = document.activeElement;
-          if (focused && sheet.contains(focused) && focused.scrollIntoView) {
-            focused.scrollIntoView({ block: "nearest" });
-          }
-        });
+      const lift = Math.max(0, window.innerHeight - vv.height);
+      if (!keyboardUp && lift > 100) {
+        if (closeTimer) window.clearTimeout(closeTimer);
+        closeTimer = 0;
+        keyboardUp = true;
+      } else if (keyboardUp && lift < 40 && !closeTimer) {
+        closeTimer = window.setTimeout(function () {
+          closeTimer = 0;
+          if (Math.max(0, window.innerHeight - vv.height) >= 40) return;
+          keyboardUp = false;
+          lastLift = 0;
+          document.documentElement.style.setProperty("--kb", "0px");
+          document.documentElement.classList.remove("kb-up");
+        }, 220);
+      } else if (lift >= 40 && closeTimer) {
+        window.clearTimeout(closeTimer);
+        closeTimer = 0;
       }
+      if (!(keyboardUp && lift < 40) && (Math.abs(lift - lastLift) >= 6 || lastLift < 0)) {
+        lastLift = lift;
+        document.documentElement.style.setProperty("--kb", Math.round(lift) + "px");
+      }
+      document.documentElement.classList.toggle("kb-up", keyboardUp);
     }
     vv.addEventListener("resize", sync);
-    vv.addEventListener("scroll", sync);
+    document.addEventListener("focusin", function (ev) {
+      const target = ev.target;
+      if (!target || !target.classList || !target.classList.contains("tag-search-input")) return;
+      if (revealTimer) window.clearTimeout(revealTimer);
+      revealTimer = window.setTimeout(function () {
+        revealTimer = 0;
+        sync();
+        if (!keyboardUp || document.activeElement !== target || !target.scrollIntoView) return;
+        const box = target.getBoundingClientRect();
+        const visibleBottom = vv.offsetTop + vv.height;
+        if (box.bottom > visibleBottom - 12) target.scrollIntoView({ block: "nearest" });
+      }, 520);
+    });
     sync();
   })();
 
   window.FamilyTags = {
     show: function (who) {
       if (person === who) {
-        load();
+        if (Date.now() - lastLoadAt > 15000) load();
         return;
       }
       person = who;
@@ -804,6 +1145,10 @@
     layoutFaces: layoutFaces,
     syncFaceZoom: syncFaceZoom,
     closePhoto: closePhoto,
+    beforePhotoChange: beforePhotoChange,
+    refreshPhoto: refreshPhoto,
+    openBatch: openBatch,
+    accept: accept,
     act: post,
     DELETE_ID: DELETE_ID,
   };

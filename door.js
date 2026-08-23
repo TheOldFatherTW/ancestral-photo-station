@@ -784,6 +784,10 @@
     }
   })();
   window.FamilyDoor = {
+    boot: function () {
+      boot();
+      startPoll();
+    },
     setSelect: function (count, inTrash, hint) {
       const n = Number(count) || 0;
       if (statusEl) {
@@ -797,15 +801,25 @@
     },
   };
   window.addEventListener("hashchange", route);
-  boot();
-  (function poll() {
-    const wait = window._familyRunning || window._familyTagging ? 3000 : 12000;
-    setTimeout(function () {
-      if (!ORIGIN) {
-        poll();
-        return;
-      }
-      Promise.resolve(boot()).then(poll);
-    }, wait);
-  })();
+  let polling = false;
+  function startPoll() {
+    if (polling) return;
+    polling = true;
+    (function poll() {
+      const wait = window._familyRunning || window._familyTagging ? 3000 : 12000;
+      setTimeout(function () {
+        if (!ORIGIN) {
+          poll();
+          return;
+        }
+        Promise.resolve(boot()).then(poll);
+      }, wait);
+    })();
+  }
+  if (window.FamiphotoGate) {
+    window.FamiphotoGate.start();
+  } else {
+    boot();
+    startPoll();
+  }
 })();

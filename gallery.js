@@ -13,7 +13,6 @@
   let run = 0;
   let lightbox;
   let thumbActive = 0;
-  let thumbSlots = THUMB_FAST;
   const thumbWait = [];
   let paintHint = function () {};
   let currentPerson = "";
@@ -31,7 +30,8 @@
   }
 
   function pumpThumbs() {
-    while (thumbActive < thumbSlots && thumbWait.length) {
+    const cap = thumbWait.length > 16 ? THUMB_SLOW : THUMB_FAST;
+    while (thumbActive < cap && thumbWait.length) {
       const job = thumbWait.shift();
       thumbActive += 1;
       job(function () {
@@ -40,6 +40,29 @@
         paintHint();
       });
     }
+  }
+
+  function watchThumb(img, url) {
+    img.dataset.thumbUrl = url;
+    if (!window.thumbObserver) {
+      window.thumbObserver = new IntersectionObserver(
+        function (entries) {
+          entries.forEach(function (en) {
+            if (!en.isIntersecting) return;
+            const node = en.target;
+            window.thumbObserver.unobserve(node);
+            const src = node.dataset.thumbUrl;
+            if (!src || node.dataset.thumbBound) return;
+            node.dataset.thumbBound = "1";
+            bindThumb(node, src, function () {
+              node.classList.add("is-on");
+            });
+          });
+        },
+        { rootMargin: "240px 0px" }
+      );
+    }
+    window.thumbObserver.observe(img);
   }
 
   function bindThumb(img, url, onReady) {
@@ -611,7 +634,11 @@
       let loading = false;
       let lastGroup = "";
       const slides = [];
-      thumbSlots = THUMB_FAST;
+      if (window.thumbObserver) {
+        window.thumbObserver.disconnect();
+        window.thumbObserver = null;
+      }
+      thumbWait.length = 0;
       feed.innerHTML = "";
       feed.dataset.person = person;
       feed.dataset.tags = (tagIds || []).join(",");
@@ -662,11 +689,10 @@
         a.dataset.key = itemKey(item);
         const img = document.createElement("img");
         img.decoding = "async";
+        img.loading = "lazy";
         img.alt = "";
         img.draggable = false;
-        bindThumb(img, qs(item, "thumb", "tile"), function () {
-          img.classList.add("is-on");
-        });
+        watchThumb(img, qs(item, "thumb", "tile"));
         const shield = document.createElement("span");
         shield.className = "tile-shield";
         a.appendChild(img);
@@ -770,7 +796,6 @@
           });
           got = (data.items || []).length;
           offset += got;
-          if (offset >= FIRST) thumbSlots = THUMB_SLOW;
           if (!offset) {
             const empty = document.createElement("p");
             empty.className = "feed-empty";
@@ -790,11 +815,8 @@
           loading = false;
           showHint();
         }
-        if (my === run && got > 0 && (!total || offset < total) && sentinelNear()) {
-          if (offset > FIRST) loadMore();
-          else window.setTimeout(function () {
-            if (my === run && sentinelNear()) loadMore();
-          }, 280);
+        if (my === run && got > 0 && (!total || offset < total) && offset > FIRST && sentinelNear()) {
+          loadMore();
         }
       }
 
@@ -914,6 +936,8 @@
       currentPerson = "";
       trashMode = false;
       clearSelect();
+      if (window.thumbObserver) window.thumbObserver.disconnect();
+      window.thumbObserver = null;
       if (window.feedObserver) window.feedObserver.disconnect();
       const sentinel = document.getElementById("feed-sentinel");
       const hint = document.getElementById("feed-hint");

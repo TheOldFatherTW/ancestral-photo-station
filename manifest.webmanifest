@@ -2,6 +2,7 @@
   "id": "./",
   "name": "Famiphoto",
   "short_name": "Famiphoto",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],

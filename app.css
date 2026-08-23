@@ -15,7 +15,61 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC",
     "Microsoft JhengHei", sans-serif;
 }
+.blobs {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.blobs[hidden] {
+  display: none !important;
+}
+.blobs span {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(72px);
+  opacity: 0.42;
+  animation: blob-float 22s ease-in-out infinite;
+}
+.blobs span:nth-child(1) {
+  width: 58vw;
+  height: 58vw;
+  left: -18vw;
+  top: -12vh;
+  background: #feda75;
+}
+.blobs span:nth-child(2) {
+  width: 52vw;
+  height: 52vw;
+  right: -16vw;
+  top: 8vh;
+  background: #d62976;
+  animation-delay: -7s;
+}
+.blobs span:nth-child(3) {
+  width: 48vw;
+  height: 48vw;
+  left: 12vw;
+  bottom: -18vh;
+  background: #962fbf;
+  animation-delay: -13s;
+}
+.blobs span:nth-child(4) {
+  width: 40vw;
+  height: 40vw;
+  right: 6vw;
+  bottom: 4vh;
+  background: #4f5bd5;
+  animation-delay: -3s;
+}
+@keyframes blob-float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(5%, 8%) scale(1.08); }
+}
 .hall {
+  position: relative;
+  z-index: 1;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -28,6 +82,52 @@ body {
   justify-content: flex-start;
   padding: calc(32px + env(safe-area-inset-top, 0px)) 16px calc(8px + env(safe-area-inset-bottom, 0px));
 }
+.hall.is-invite {
+  min-height: 100vh;
+  justify-content: center;
+}
+.hall.is-invite .local-cabs,
+.hall.is-invite #album,
+.hall.is-invite .tag-board {
+  display: none !important;
+}
+.invite-panel {
+  width: min(420px, 92vw);
+  margin: 4px auto 0;
+  text-align: center;
+}
+.invite-panel[hidden],
+.invite-panel form[hidden],
+.invite-panel div[hidden],
+.invite-hey[hidden],
+.invite-safari[hidden],
+.invite-go[hidden] {
+  display: none !important;
+}
+.invite-hey {
+  margin: 22px 0 0;
+  font-size: clamp(18px, 5.4vw, 22px);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+.invite-safari {
+  margin: 20px 0 0;
+  font-size: 16px;
+  color: var(--mute);
+}
+.invite-panel form {
+  margin-top: 22px;
+  text-align: left;
+}
+button.invite-go {
+  margin: 28px auto 0;
+  width: min(280px, 100%);
+  border-radius: 999px;
+  background: var(--rose);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
 .feed {
   width: min(720px, 100%);
   margin: 28px auto 0;
@@ -39,6 +139,8 @@ body {
   position: relative;
   display: block;
   aspect-ratio: 1;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
   background: #efe8ea;
   overflow: hidden;
   color: transparent;
@@ -1098,6 +1200,9 @@ button, .btn {
 @media (prefers-reduced-motion: reduce) {
   .cab-cover.is-run .cab-ring,
   .ins-icon.is-run .ins-ring {
+    animation: none;
+  }
+  .blobs span {
     animation: none;
   }
 }

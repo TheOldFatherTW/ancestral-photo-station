@@ -309,9 +309,11 @@
         "position:fixed;left:0;top:0;width:1px;height:1px;opacity:0.01;pointer-events:none;";
       document.body.appendChild(uploadInput);
       uploadInput.addEventListener("change", function () {
+        // The input keeps its pick until the next one is opened. Emptying it here would
+        // be tidier, but iOS backs each File with a temporary file it is free to drop
+        // the moment the input lets go, and then the vault is handed nothing at all.
         const picked = Array.prototype.slice.call(uploadInput.files || []);
         const who = uploadPerson;
-        uploadInput.value = "";
         if (!picked.length || !who) return;
         // Let the strip paint before the sizes get added up, so a big pick does not
         // spend its first moment back from the picker looking just as dead as before.
@@ -386,7 +388,7 @@
             return null;
           });
           if (!res.ok || !data) {
-            blame("伺服器回 " + res.status);
+            blame((data && data.error) || "伺服器回 " + res.status);
             failed += group.length;
           } else {
             saved += (data.saved || []).length;

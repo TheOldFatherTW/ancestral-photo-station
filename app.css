@@ -1101,6 +1101,23 @@ button, .btn {
 .kb-up .photo-rail {
   display: none !important;
 }
+.kb-up .blobs {
+  display: none;
+}
+.kb-up .hall.is-invite {
+  justify-content: flex-start;
+  min-height: 0;
+  height: calc(100vh - var(--kb, 0px));
+  max-height: calc(100vh - var(--kb, 0px));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-top: calc(8px + env(safe-area-inset-top, 0px));
+  padding-bottom: 8px;
+}
+.kb-up .hall.is-invite .rose-two,
+.kb-up .hall.is-invite .credit {
+  display: none;
+}
 .tag-chip-wrap.is-ghost {
   opacity: 0.5;
 }

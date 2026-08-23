@@ -323,4 +323,29 @@
   }
 
   window.FamiphotoGate = { start: start };
+
+  // Same pitfall as the hashtag sheet: iOS does not shrink the layout viewport,
+  // so a field in the lower half sits behind the keyboard. --kb / .kb-up live on
+  // <html> so any page that loads this file can lift its inputs.
+  (function watchKeyboard() {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    function sync() {
+      const lift = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      const up = lift > 80;
+      document.documentElement.style.setProperty("--kb", Math.round(lift) + "px");
+      document.documentElement.classList.toggle("kb-up", up);
+      if (!up) return;
+      window.requestAnimationFrame(function () {
+        const focused = document.activeElement;
+        if (!focused || !focused.scrollIntoView) return;
+        if (focused.tagName !== "INPUT" && focused.tagName !== "TEXTAREA") return;
+        focused.scrollIntoView({ block: "center" });
+      });
+    }
+    vv.addEventListener("resize", sync);
+    vv.addEventListener("scroll", sync);
+    window.addEventListener("focusin", sync);
+    sync();
+  })();
 })();

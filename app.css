@@ -181,6 +181,9 @@ button.apple-next path {
   height: 22px;
   margin: 0 0 14px;
 }
+.thinking-five[hidden] {
+  display: none !important;
+}
 .thinking-five span {
   width: 10px;
   height: 10px;

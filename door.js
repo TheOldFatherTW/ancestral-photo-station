@@ -637,7 +637,7 @@
   function fillHud(hud, p) {
     const id = p.id;
     const backupRun = p.sync === "running";
-    if (!backupRun) backupAsk[id] = false;
+    if (backupRun) backupAsk[id] = false;
     if (!backupRun && (p.sync === "synced" || p.percent === 100)) {
       try {
         localStorage.setItem("family.backupDone." + id, "1");
@@ -647,7 +647,7 @@
     try {
       remembered = localStorage.getItem("family.backupDone." + id) === "1";
     } catch (e) {}
-    const showRun = backupRun && backupAsk[id];
+    const showRun = backupRun || !!backupAsk[id];
     const backupDone = !showRun && (remembered || p.sync === "synced" || p.percent === 100);
     paintHp(hud.querySelector('.hp[data-kind="backup"]'), {
       running: showRun,

@@ -27,6 +27,7 @@
   // gives up, and that the bar moves often, since Safari reports no progress of its own.
   const BATCH_CAP = 12 * 1024 * 1024;
   let backupAsk = {};
+  let heldByPerson = {};
   const CAMERA =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="8" width="17" height="11.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 8l1.4-2.4h5.2L16 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="13.6" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>';
   const REFRESH =
@@ -71,6 +72,66 @@
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  function heldKeySet(keys) {
+    const set = {};
+    (keys || []).forEach(function (k) {
+      set[k] = true;
+    });
+    return set;
+  }
+
+  function fileIsHeld(file, set) {
+    if (!set) return false;
+    const name = ((file && file.name) || "").split(/[/\\]/).pop();
+    const dot = name.lastIndexOf(".");
+    const base = (dot > 0 ? name.slice(0, dot) : name).toUpperCase();
+    if (!base) return false;
+    if (set[base]) return true;
+    let ym = "";
+    if (file && file.lastModified) {
+      const d = new Date(file.lastModified);
+      if (!Number.isNaN(d.getTime())) {
+        ym = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+      }
+    }
+    if (ym && set[ym + "|" + base]) return true;
+    let m = /^(IMG_)E?([0-9]+)/i.exec(base);
+    let token = "";
+    if (m) token = "IMG_" + m[2];
+    else {
+      m = /^(IMG_[0-9A-Z]+)/i.exec(base);
+      if (m) token = m[1].toUpperCase();
+    }
+    return !!(token && ym && set[ym + "|" + token]);
+  }
+
+  function fetchHeld(person) {
+    const hit = heldByPerson[person];
+    if (hit && Date.now() - hit.at < 10 * 60 * 1000) {
+      return Promise.resolve(hit.set);
+    }
+    const ctrl = new AbortController();
+    const timer = setTimeout(function () {
+      ctrl.abort();
+    }, 20000);
+    return fetch(api("/api/held?person=" + encodeURIComponent(person)), { signal: ctrl.signal })
+      .then(function (res) {
+        if (!res.ok) throw new Error("held");
+        return res.json();
+      })
+      .then(function (j) {
+        const set = heldKeySet((j && j.keys) || []);
+        heldByPerson[person] = { at: Date.now(), set: set };
+        return set;
+      })
+      .catch(function () {
+        return null;
+      })
+      .finally(function () {
+        clearTimeout(timer);
+      });
   }
 
   function personFromHash() {
@@ -286,15 +347,28 @@
     }
     uploadBusy = true;
     const url = api("/api/upload?person=" + encodeURIComponent(person));
+    const held = await fetchHeld(person);
+    const fresh = [];
+    let already = 0;
+    files.forEach(function (f) {
+      if (held && fileIsHeld(f, held)) already += 1;
+      else fresh.push(f);
+    });
+    if (!fresh.length) {
+      paintUp(already ? already + " 張本來就有" : "沒有新的照片", "", 1);
+      uploadBusy = false;
+      if (uploadBtn) uploadBtn.classList.remove("is-run");
+      closeUp(20000);
+      return;
+    }
     // Grouped by weight rather than count: one pass of holiday videos and one pass of
     // screenshots are wildly different sizes, and a whole pick in one POST would be refused.
     const groups = [];
     let saved = 0;
-    let already = 0;
     let failed = 0;
     let total = 0;
     let bytes = 0;
-    files.forEach(function (f) {
+    fresh.forEach(function (f) {
       if (f.size > UPLOAD_CAP) {
         failed += 1;
         return;
@@ -360,6 +434,7 @@
       }
       paintUp(bits.length ? bits.join("，") : "沒有新的照片", "", 1);
       if (saved) {
+        delete heldByPerson[person];
         lastCab = "";
         await boot();
         if (openPerson === person && window.FamilyFeed && window.FamilyFeed.refresh) {

@@ -8,7 +8,8 @@
   let selected = [];
   let applied = [];
   let collapsed = { "地點": true, "類型": true, "自訂": true, "人物": true };
-  let mode = "basic";
+  let mode = "all";
+  let modeActive = "all";
   let lastBoard = { groups: [], job: {} };
   let sheet = null;
   let sheetItem = null;
@@ -220,7 +221,9 @@
 
   function createPicker(opts) {
     const root = document.createElement("div");
-    root.className = "tag-picker";
+    root.className = "tag-picker" + (opts.hideInput ? " no-search" : "");
+    const card = document.createElement("div");
+    card.className = "tag-picker-card";
     const chosen = document.createElement("div");
     chosen.className = "tag-picker-chosen";
     const form = document.createElement("form");
@@ -230,11 +233,12 @@
     const go = submitArrow(opts.actionText, opts.mainAction ? "mode-pick" : "");
     const suggest = document.createElement("div");
     suggest.className = "tag-picker-suggest";
-    form.appendChild(input);
+    if (!opts.hideInput) form.appendChild(input);
     form.appendChild(go);
-    root.appendChild(chosen);
-    root.appendChild(form);
-    root.appendChild(suggest);
+    card.appendChild(chosen);
+    card.appendChild(form);
+    card.appendChild(suggest);
+    root.appendChild(card);
 
     function ids() {
       return opts.ids;
@@ -245,7 +249,7 @@
       if (at >= 0) ids().splice(at, 1);
       else ids().push(tag.id);
       input.value = "";
-      if (keepFocus) {
+      if (keepFocus && input.isConnected) {
         try {
           input.focus({ preventScroll: true });
         } catch (e) {
@@ -273,7 +277,7 @@
       ids().forEach(function (id) {
         exceptIds[id] = true;
       });
-      if (document.activeElement === input || input.value) {
+      if (!opts.hideInput && (document.activeElement === input || input.value)) {
         renderSuggestions(
           suggest,
           input.value,
@@ -315,14 +319,39 @@
     return { node: root, refresh: refresh, input: input };
   }
 
+  function updateModeButtons() {
+    if (!board) return;
+    board.querySelectorAll(".mode-btn[data-mode]").forEach(function (btn) {
+      btn.classList.toggle("is-on", btn.dataset.mode === modeActive);
+    });
+  }
+
   function modeBtn(id, label) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "mode-btn" + (mode === id ? " is-on" : "");
+    btn.dataset.mode = id;
+    btn.className = "mode-btn" + (modeActive === id ? " is-on" : "");
     btn.textContent = label;
     btn.addEventListener("click", function () {
-      if (mode === id) return;
+      if (id === "all") {
+        if (
+          mode === "all" &&
+          modeActive === "all" &&
+          !selected.length &&
+          !applied.length
+        ) {
+          return;
+        }
+        mode = "all";
+        modeActive = "all";
+        selected.splice(0, selected.length);
+        if (window.FamilyFeed) window.FamilyFeed.filter([]);
+        paint(lastBoard);
+        return;
+      }
+      if (mode === id && modeActive === id) return;
       mode = id;
+      modeActive = id;
       paint(lastBoard);
     });
     return btn;
@@ -338,13 +367,14 @@
     board.innerHTML = "";
     const bar = document.createElement("div");
     bar.className = "mode-bar";
-    bar.appendChild(modeBtn("basic", "Basic mode"));
-    bar.appendChild(modeBtn("hashtag", "Hashtag mode"));
+    bar.appendChild(modeBtn("all", "All"));
+    bar.appendChild(modeBtn("list", "List"));
     board.appendChild(bar);
     const picker = createPicker({
       ids: selected,
       actionText: "Pick",
       mainAction: true,
+      hideInput: mode === "list",
       appliedIds: function () {
         return applied;
       },
@@ -358,7 +388,7 @@
     });
     pickerRefresh = picker.refresh;
     board.appendChild(picker.node);
-    if (mode !== "hashtag") return;
+    if (mode !== "list") return;
     (lastBoard.groups || []).forEach(function (group) {
       if (!group.tags || !group.tags.length) return;
       const wrap = document.createElement("section");
@@ -1235,7 +1265,8 @@
         return;
       }
       person = who;
-      mode = "basic";
+      mode = "all";
+      modeActive = "all";
       selected = [];
       applied = [];
       load();
@@ -1253,7 +1284,9 @@
     setApplied: function (ids) {
       applied = (ids || []).slice();
       selected.splice.apply(selected, [0, selected.length].concat(applied));
+      if (!(modeActive === "all" && !applied.length)) modeActive = "";
       pickerRefresh();
+      updateModeButtons();
     },
     accept: accept,
     act: post,

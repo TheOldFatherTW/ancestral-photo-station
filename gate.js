@@ -2,6 +2,7 @@
   const ORIGIN = (window.VAULT_ORIGIN || "").replace(/\/$/, "");
   const KEY_RE = /^[A-Za-z0-9_-]{8,128}$/;
   const DISCONNECTED = "目前無法連上,請聯絡維護的那個傢伙";
+  const BAD_PASS = "Apple帳號密碼錯誤";
   const statusEl = document.getElementById("status");
   const hall = document.getElementById("hall");
   const blobs = document.getElementById("blobs");
@@ -9,13 +10,19 @@
   const hey = document.getElementById("invite-hey");
   const safariNote = document.getElementById("invite-safari");
   const goBtn = document.getElementById("invite-go");
-  const authForm = document.getElementById("invite-auth");
+  const appleForm = document.getElementById("invite-apple-form");
+  const passForm = document.getElementById("invite-pass-form");
   const mfaForm = document.getElementById("invite-mfa");
-  const installEl = document.getElementById("invite-install");
-  const authErr = document.getElementById("invite-auth-err");
+  const waitEl = document.getElementById("invite-wait");
+  const waitBar = document.getElementById("invite-wait-bar");
+  const appleErr = document.getElementById("invite-apple-err");
+  const passErr = document.getElementById("invite-pass-err");
   const mfaErr = document.getElementById("invite-mfa-err");
+  const homeInstall = document.getElementById("home-install");
   let inviteKey = "";
   let ticket = "";
+  let appleId = "";
+  let busy = false;
 
   function api(path, key) {
     const url = ORIGIN + path;
@@ -91,13 +98,31 @@
     if (hey) hey.hidden = true;
     if (safariNote) safariNote.hidden = true;
     if (goBtn) goBtn.hidden = true;
-    if (authForm) authForm.hidden = true;
+    if (appleForm) appleForm.hidden = true;
+    if (passForm) passForm.hidden = true;
     if (mfaForm) mfaForm.hidden = true;
-    if (installEl) installEl.hidden = true;
+    if (waitEl) waitEl.hidden = true;
+  }
+
+  function focusField(id) {
+    window.requestAnimationFrame(function () {
+      const el = document.getElementById(id);
+      if (el && el.focus) el.focus();
+    });
+  }
+
+  function showWait() {
+    hideAllInvite();
+    if (statusEl) statusEl.textContent = "";
+    if (waitEl) waitEl.hidden = false;
+    if (waitBar && window.RoseTwo && window.RoseTwo.mountBar) {
+      window.RoseTwo.mountBar(waitBar);
+    }
   }
 
   function showLanding() {
     hideAllInvite();
+    busy = false;
     if (statusEl) statusEl.textContent = "";
     if (hey) hey.hidden = false;
     if (needsSafari()) {
@@ -105,6 +130,24 @@
       return;
     }
     if (goBtn) goBtn.hidden = false;
+  }
+
+  function showPass(err) {
+    hideAllInvite();
+    busy = false;
+    if (passForm) passForm.hidden = false;
+    if (passErr) passErr.textContent = err || "";
+    const passEl = document.getElementById("invite-pass");
+    if (passEl) passEl.value = "";
+    focusField("invite-pass");
+  }
+
+  function showMfa(err) {
+    hideAllInvite();
+    busy = false;
+    if (mfaForm) mfaForm.hidden = false;
+    if (mfaErr) mfaErr.textContent = err || "";
+    focusField("invite-code");
   }
 
   function showInviteChrome() {
@@ -118,6 +161,35 @@
     if (blobs) blobs.hidden = true;
     if (panel) panel.hidden = true;
     hideAllInvite();
+  }
+
+  function showHomeInstallIfNeeded() {
+    if (!homeInstall) return;
+    if (isStandalone()) {
+      try {
+        sessionStorage.removeItem("family.needInstall");
+      } catch (e) {}
+      homeInstall.hidden = true;
+      return;
+    }
+    let need = false;
+    try {
+      need = sessionStorage.getItem("family.needInstall") === "1";
+    } catch (e) {}
+    homeInstall.hidden = !need;
+  }
+
+  function goToPersonal() {
+    try {
+      if (isStandalone()) sessionStorage.removeItem("family.needInstall");
+      else sessionStorage.setItem("family.needInstall", "1");
+    } catch (e) {}
+    if (window.FAMILY_FORCE_INVITE) {
+      location.replace("./");
+      return;
+    }
+    openAlbum();
+    showHomeInstallIfNeeded();
   }
 
   function openAlbum() {
@@ -136,16 +208,6 @@
     }
   }
 
-  function showInstallThenAlbum() {
-    if (isStandalone()) {
-      openAlbum();
-      return;
-    }
-    hideAllInvite();
-    if (installEl) installEl.hidden = false;
-    if (statusEl) statusEl.textContent = "";
-  }
-
   function watchAuth() {
     readJson("/api/invite/auth?t=" + encodeURIComponent(ticket), inviteKey)
       .then(function (x) {
@@ -155,19 +217,18 @@
           return;
         }
         if (x.j.phase === "failed") {
-          if (authErr) authErr.textContent = x.j.error || "請再試一次";
-          hideAllInvite();
-          if (authForm) authForm.hidden = false;
+          showPass(x.j.error || BAD_PASS);
           return;
         }
         if (x.j.phase === "ready" && x.j.token) {
           savePersonal(x.j.token);
-          showInstallThenAlbum();
+          goToPersonal();
           return;
         }
         if (x.j.need_mfa) {
-          hideAllInvite();
-          if (mfaForm) mfaForm.hidden = false;
+          if (!mfaForm || mfaForm.hidden) showMfa("");
+        } else if (!waitEl || waitEl.hidden) {
+          showWait();
         }
         window.setTimeout(watchAuth, 1200);
       })
@@ -185,6 +246,7 @@
     }
     showInviteChrome();
     if (ticket) {
+      showWait();
       watchAuth();
       return;
     }
@@ -194,21 +256,39 @@
   if (goBtn) {
     goBtn.addEventListener("click", function () {
       hideAllInvite();
-      if (authForm) authForm.hidden = false;
-      if (authErr) authErr.textContent = "";
+      if (appleForm) appleForm.hidden = false;
+      if (appleErr) appleErr.textContent = "";
+      focusField("invite-apple");
     });
   }
 
-  if (authForm) {
-    authForm.addEventListener("submit", function (ev) {
+  if (appleForm) {
+    appleForm.addEventListener("submit", function (ev) {
       ev.preventDefault();
-      const apple = (document.getElementById("invite-apple") || {}).value || "";
+      if (busy) return;
+      const apple = ((document.getElementById("invite-apple") || {}).value || "").trim();
+      if (!apple) return;
+      appleId = apple;
+      if (appleErr) appleErr.textContent = "";
+      hideAllInvite();
+      if (passForm) passForm.hidden = false;
+      if (passErr) passErr.textContent = "";
+      focusField("invite-pass");
+    });
+  }
+
+  if (passForm) {
+    passForm.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      if (busy) return;
       const pass = (document.getElementById("invite-pass") || {}).value || "";
-      if (authErr) authErr.textContent = "";
-      postJson("/api/invite/login", inviteKey, { apple_id: apple, password: pass })
+      if (!pass) return;
+      busy = true;
+      showWait();
+      postJson("/api/invite/login", inviteKey, { apple_id: appleId, password: pass })
         .then(function (x) {
           if (!x.res.ok) {
-            if (authErr) authErr.textContent = (x.j && x.j.error) || "現在登不進去";
+            showPass((x.j && x.j.error) || BAD_PASS);
             return;
           }
           ticket = x.j.ticket || "";
@@ -217,12 +297,10 @@
           } catch (e) {}
           const passEl = document.getElementById("invite-pass");
           if (passEl) passEl.value = "";
-          hideAllInvite();
-          if (statusEl) statusEl.textContent = "請稍候…";
           watchAuth();
         })
         .catch(function () {
-          if (authErr) authErr.textContent = DISCONNECTED;
+          showPass(DISCONNECTED);
         });
     });
   }
@@ -230,28 +308,37 @@
   if (mfaForm) {
     mfaForm.addEventListener("submit", function (ev) {
       ev.preventDefault();
+      if (busy) return;
       const code = (document.getElementById("invite-code") || {}).value || "";
-      if (mfaErr) mfaErr.textContent = "";
+      if (!code) return;
+      busy = true;
+      showWait();
       postJson("/api/invite/code", inviteKey, { ticket: ticket, code: code })
         .then(function (x) {
           if (!x.res.ok) {
-            if (mfaErr) mfaErr.textContent = (x.j && x.j.error) || "驗證碼送不出去";
+            showMfa((x.j && x.j.error) || "驗證碼送不出去");
             return;
           }
           watchAuth();
         })
         .catch(function () {
-          if (mfaErr) mfaErr.textContent = DISCONNECTED;
+          showMfa(DISCONNECTED);
         });
     });
   }
 
-  const installed = document.getElementById("invite-installed");
+  const installed = document.getElementById("home-installed");
   if (installed) {
-    installed.addEventListener("click", openAlbum);
+    installed.addEventListener("click", function () {
+      try {
+        sessionStorage.removeItem("family.needInstall");
+      } catch (e) {}
+      if (homeInstall) homeInstall.hidden = true;
+    });
   }
 
   function start() {
+    showHomeInstallIfNeeded();
     if (window.FAMILY_FORCE_INVITE) {
       const urlK = window.FAMILY_URL_KEY || "";
       if (!urlK) {
@@ -310,6 +397,7 @@
           stripUrlKey();
         }
         openAlbum();
+        showHomeInstallIfNeeded();
       })
       .catch(function () {
         if (urlK) {
@@ -319,6 +407,7 @@
         }
         fail(DISCONNECTED);
         if (stored && window.FamilyDoor && window.FamilyDoor.boot) window.FamilyDoor.boot();
+        showHomeInstallIfNeeded();
       });
   }
 

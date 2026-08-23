@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="./icons/rose-two-180.png"/>
 <link rel="manifest" href="./manifest.webmanifest?v=34"/>
 <link rel="stylesheet" href="./vendor/photoswipe/photoswipe.css"/>
-<link rel="stylesheet" href="./app.css?v=49"/>
+<link rel="stylesheet" href="./app.css?v=51"/>
 <script src="./config.js?v=1787366995"></script>
 <script>
 (function () {
@@ -52,24 +52,39 @@
     <p class="invite-hey" id="invite-hey">Hey! 開始備份你的照片</p>
     <p class="invite-safari" id="invite-safari" hidden>請用 Safari 打開</p>
     <button type="button" class="invite-go" id="invite-go">開始備份</button>
-    <form id="invite-auth" hidden>
-      <p class="err" id="invite-auth-err"></p>
+    <form id="invite-apple-form" hidden>
+      <p class="err" id="invite-apple-err"></p>
       <label for="invite-apple">Apple ID</label>
-      <input id="invite-apple" type="email" autocomplete="username" required/>
+      <div class="apple-row">
+        <input id="invite-apple" type="email" autocomplete="username" required/>
+        <button type="submit" class="apple-next" aria-label="繼續">
+          <svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="18"/><path d="M15.2 11.5L22.5 18l-7.3 6.5"/></svg>
+        </button>
+      </div>
+    </form>
+    <form id="invite-pass-form" hidden>
+      <p class="err" id="invite-pass-err"></p>
       <label for="invite-pass">密碼</label>
-      <input id="invite-pass" type="password" autocomplete="current-password" required/>
-      <button type="submit">下一步</button>
+      <div class="apple-row">
+        <input id="invite-pass" type="password" autocomplete="current-password" required/>
+        <button type="submit" class="apple-next" aria-label="繼續">
+          <svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="18"/><path d="M15.2 11.5L22.5 18l-7.3 6.5"/></svg>
+        </button>
+      </div>
     </form>
     <form id="invite-mfa" hidden>
-      <p class="meta">請輸入手機上的 6 位數</p>
       <p class="err" id="invite-mfa-err"></p>
       <label for="invite-code">驗證碼</label>
-      <input id="invite-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" required/>
-      <button type="submit">送出</button>
+      <div class="apple-row">
+        <input id="invite-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" required/>
+        <button type="submit" class="apple-next" aria-label="繼續">
+          <svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="18"/><path d="M15.2 11.5L22.5 18l-7.3 6.5"/></svg>
+        </button>
+      </div>
     </form>
-    <div id="invite-install" hidden>
-      <p class="invite-hey">請點底部分享，再選加入主畫面</p>
-      <button type="button" class="invite-go" id="invite-installed">完成</button>
+    <div class="invite-wait" id="invite-wait" hidden>
+      <div class="thinking-five" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+      <div class="invite-wait-bar" id="invite-wait-bar"></div>
     </div>
   </div>
   <div class="local-cabs">
@@ -90,13 +105,17 @@
   </div>
 </div>
 <aside class="photo-rail" id="photo-rail" hidden aria-label="照片操作"></aside>
+<div class="home-install" id="home-install" hidden>
+  <p>請點底部分享，再選加入主畫面</p>
+  <button type="button" class="invite-go" id="home-installed">我已加入</button>
+</div>
 <script src="./vendor/photoswipe/photoswipe.umd.min.js"></script>
 <script src="./vendor/photoswipe/photoswipe-lightbox.umd.min.js"></script>
 <script src="./rose-two.js?v=22"></script>
 <script src="./gallery.js?v=43"></script>
 <script src="./tags.js?v=42"></script>
-<script src="./gate.js?v=5"></script>
-<script src="./door.js?v=44"></script>
+<script src="./gate.js?v=7"></script>
+<script src="./door.js?v=46"></script>
 <script>
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js?v=44");

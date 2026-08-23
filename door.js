@@ -572,14 +572,15 @@
     });
     const job = p.tag || {};
     const tagRun = job.state === "running";
-    const tagDone = !tagRun && job.percent === 100;
+    const hasPhotos = (p.icloud_files || 0) + (p.usb_files || 0) > 0;
+    const tagDone = hasPhotos && !tagRun && job.percent === 100;
     paintHp(hud.querySelector('.hp[data-kind="tag"]'), {
       running: tagRun,
       done: tagDone,
-      percent: job.percent,
+      percent: tagRun ? job.percent : tagDone ? 100 : null,
       busyText: "自動標記中…",
       doneText: "標記完成",
-      waitText: "自動標記中…",
+      waitText: "尚未標記",
     });
     const refresh = hud.querySelector(".cab-refresh");
     if (refresh) refresh.classList.toggle("is-run", showRun);

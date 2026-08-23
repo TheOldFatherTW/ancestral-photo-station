@@ -14,17 +14,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600&display=swap" rel="stylesheet"/>
 <link rel="icon" href="./rose-two.svg" type="image/svg+xml"/>
 <link rel="apple-touch-icon" href="./icons/rose-two-180.png"/>
-<link rel="manifest" href="./manifest.webmanifest?v=34"/>
-<link rel="stylesheet" href="./vendor/photoswipe/photoswipe.css"/>
 <link rel="stylesheet" href="./app.css?v=47"/>
 <script src="./config.js?v=1787366995"></script>
 <script>
 (function () {
-  var stored = "";
-  try { stored = localStorage.getItem("family.viewKey") || ""; } catch (e) {}
   var q = new URLSearchParams(location.search).get("k") || "";
+  window.FAMILY_FORCE_INVITE = true;
   window.FAMILY_URL_KEY = /^[A-Za-z0-9_-]{8,128}$/.test(q) ? q : "";
-  window.FAMILY_VIEW_KEY = window.FAMILY_URL_KEY ? "" : stored;
+  window.FAMILY_VIEW_KEY = "";
   window.FAMILY_SKIP_BOOT = true;
   var origin = window.VAULT_ORIGIN;
   if (origin) {
@@ -38,17 +35,17 @@
 </script>
 </head>
 <body>
-<div class="blobs" id="blobs" hidden aria-hidden="true">
+<div class="blobs" id="blobs" aria-hidden="true">
   <span></span><span></span><span></span><span></span>
 </div>
-<div class="hall with-feed" id="hall">
+<div class="hall with-feed is-invite" id="hall">
   <div class="profile">
     <div class="rose-two" id="rose-two"></div>
     <h1 class="brand">Famiphoto</h1>
     <p class="credit">since 2026 from 章晨風</p>
-    <p class="status" id="status">正在問備份硬碟…</p>
+    <p class="status" id="status"></p>
   </div>
-  <div class="invite-panel" id="invite-panel" hidden>
+  <div class="invite-panel" id="invite-panel">
     <p class="invite-hey" id="invite-hey">Hey! 開始備份你的照片</p>
     <p class="invite-safari" id="invite-safari" hidden>請用 Safari 打開</p>
     <button type="button" class="invite-go" id="invite-go">開始備份</button>
@@ -72,35 +69,11 @@
       <button type="button" class="invite-go" id="invite-installed">完成</button>
     </div>
   </div>
-  <div class="local-cabs">
-    <div class="grid" id="cabinets"></div>
-  </div>
-  <div class="tag-board" id="tag-board" hidden></div>
-  <div id="album" hidden>
-    <div class="wrap album-bar" style="padding-top:8px">
-      <a class="back" href="#">← 全部櫃子</a>
-      <div class="album-head">
-        <h2 id="album-title"></h2>
-        <button type="button" class="cover-change" id="album-cover-btn" aria-label="更換封面" title="更換封面"></button>
-      </div>
-    </div>
-    <div class="feed" id="feed"></div>
-    <p class="feed-hint" id="feed-hint" hidden>讀取照片中…</p>
-    <div class="feed-sentinel" id="feed-sentinel" hidden></div>
-  </div>
 </div>
-<aside class="photo-rail" id="photo-rail" hidden aria-label="照片操作"></aside>
-<script src="./vendor/photoswipe/photoswipe.umd.min.js"></script>
-<script src="./vendor/photoswipe/photoswipe-lightbox.umd.min.js"></script>
 <script src="./rose-two.js?v=22"></script>
-<script src="./gallery.js?v=43"></script>
-<script src="./tags.js?v=42"></script>
 <script src="./gate.js?v=3"></script>
-<script src="./door.js?v=44"></script>
 <script>
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js?v=44");
-}
+if (window.FamiphotoGate) window.FamiphotoGate.start();
 </script>
 </body>
 </html>

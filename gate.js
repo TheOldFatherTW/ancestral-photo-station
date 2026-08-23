@@ -121,8 +121,19 @@
   }
 
   function openAlbum() {
+    if (window.FAMILY_FORCE_INVITE) {
+      location.replace("./");
+      return;
+    }
     hideInviteChrome();
-    if (window.FamilyDoor && window.FamilyDoor.boot) window.FamilyDoor.boot();
+    if (window.FamilyDoor && window.FamilyDoor.boot) {
+      if (!window.FAMILY_VIEW_KEY) {
+        try {
+          window.FAMILY_VIEW_KEY = localStorage.getItem("family.viewKey") || "";
+        } catch (e) {}
+      }
+      window.FamilyDoor.boot();
+    }
   }
 
   function showInstallThenAlbum() {
@@ -241,6 +252,32 @@
   }
 
   function start() {
+    if (window.FAMILY_FORCE_INVITE) {
+      const urlK = window.FAMILY_URL_KEY || "";
+      if (!urlK) {
+        fail("請用給你的專用連結打開");
+        return;
+      }
+      if (!ORIGIN) {
+        fail(DISCONNECTED);
+        startInvite(urlK);
+        return;
+      }
+      readJson("/api/door", urlK)
+        .then(function (x) {
+          if (x.res.ok && x.j && x.j.kind === "invite") {
+            startInvite(urlK);
+            return;
+          }
+          fail((x.j && x.j.error) === "need_key" ? "請用給你的專用連結打開" : DISCONNECTED);
+          startInvite(urlK);
+        })
+        .catch(function () {
+          startInvite(urlK);
+          fail(DISCONNECTED);
+        });
+      return;
+    }
     if (!ORIGIN) {
       fail(DISCONNECTED);
       if (window.FamilyDoor && window.FamilyDoor.boot) window.FamilyDoor.boot();

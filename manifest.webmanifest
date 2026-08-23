@@ -6,6 +6,7 @@
   "scope": "./",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
+  "capture_links": "none",
   "background_color": "#fafafa",
   "theme_color": "#fafafa",
   "lang": "zh-Hant",

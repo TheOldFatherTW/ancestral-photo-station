@@ -1104,6 +1104,11 @@ button, .btn {
 .kb-up .blobs {
   display: none;
 }
+html.kb-up,
+html.kb-up body {
+  overflow: hidden;
+  height: 100%;
+}
 .kb-up .hall.is-invite {
   justify-content: flex-start;
   min-height: 0;

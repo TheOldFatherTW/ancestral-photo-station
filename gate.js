@@ -258,21 +258,10 @@
       .then(function (x) {
         if (!x.res.ok || !x.j || !x.j.kind) {
           fail((x.j && x.j.error) === "need_key" ? "請用給你的專用連結打開" : DISCONNECTED);
-          if (window.FamilyDoor && window.FamilyDoor.boot) window.FamilyDoor.boot();
+          if (!urlK && window.FamilyDoor && window.FamilyDoor.boot) window.FamilyDoor.boot();
           return;
         }
         if (x.j.kind === "invite") {
-          if (stored && stored !== probe) {
-            return readJson("/api/door", stored).then(function (y) {
-              if (y.res.ok && y.j && y.j.kind === "album") {
-                window.FAMILY_VIEW_KEY = stored;
-                stripUrlKey();
-                openAlbum();
-                return;
-              }
-              startInvite(probe);
-            });
-          }
           startInvite(probe);
           return;
         }
@@ -286,10 +275,13 @@
         openAlbum();
       })
       .catch(function () {
-        fail(DISCONNECTED);
-        if (stored) {
-          if (window.FamilyDoor && window.FamilyDoor.boot) window.FamilyDoor.boot();
+        if (urlK) {
+          startInvite(urlK);
+          fail(DISCONNECTED);
+          return;
         }
+        fail(DISCONNECTED);
+        if (stored && window.FamilyDoor && window.FamilyDoor.boot) window.FamilyDoor.boot();
       });
   }
 

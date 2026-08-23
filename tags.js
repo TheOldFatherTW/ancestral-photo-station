@@ -224,8 +224,8 @@
     root.className = "tag-picker" + (opts.hideInput ? " no-search" : "");
     const card = document.createElement("div");
     card.className = "tag-picker-card";
-    const chosen = document.createElement("div");
-    chosen.className = "tag-picker-chosen";
+    const chosen = opts.chosenHost || document.createElement("div");
+    if (!opts.chosenHost) chosen.className = "tag-picker-chosen";
     const form = document.createElement("form");
     form.className = "tag-picker-form";
     form.autocomplete = "off";
@@ -233,9 +233,10 @@
     const go = submitArrow(opts.actionText, opts.mainAction ? "mode-pick" : "");
     const suggest = document.createElement("div");
     suggest.className = "tag-picker-suggest";
+    let blurTimer = 0;
     if (!opts.hideInput) form.appendChild(input);
     form.appendChild(go);
-    card.appendChild(chosen);
+    if (!opts.chosenHost) card.appendChild(chosen);
     card.appendChild(form);
     card.appendChild(suggest);
     root.appendChild(card);
@@ -277,7 +278,12 @@
       ids().forEach(function (id) {
         exceptIds[id] = true;
       });
-      if (!opts.hideInput && (document.activeElement === input || input.value)) {
+      if (
+        !opts.hideInput &&
+        (root.classList.contains("is-searching") ||
+          document.activeElement === input ||
+          input.value)
+      ) {
         renderSuggestions(
           suggest,
           input.value,
@@ -299,7 +305,25 @@
       }
     }
 
-    input.addEventListener("focus", refresh);
+    input.addEventListener("focus", function () {
+      if (blurTimer) window.clearTimeout(blurTimer);
+      root.classList.add("is-searching");
+      refresh();
+    });
+    function finishBlur() {
+      blurTimer = 0;
+      if (document.activeElement === input) return;
+      if (document.documentElement.classList.contains("kb-up")) {
+        blurTimer = window.setTimeout(finishBlur, 120);
+        return;
+      }
+      root.classList.remove("is-searching");
+      refresh();
+    }
+    input.addEventListener("blur", function () {
+      if (blurTimer) window.clearTimeout(blurTimer);
+      blurTimer = window.setTimeout(finishBlur, 180);
+    });
     input.addEventListener("input", refresh);
     form.addEventListener("submit", function (ev) {
       ev.preventDefault();
@@ -313,6 +337,11 @@
         .map(tagById)
         .filter(Boolean);
       const fresh = opts.allowNew && label && !exact ? label : "";
+      if (opts.mainAction) {
+        root.classList.remove("is-searching");
+        suggest.innerHTML = "";
+        input.blur();
+      }
       opts.onSubmit(choices, fresh);
     });
     refresh();
@@ -370,8 +399,12 @@
     bar.appendChild(modeBtn("all", "All"));
     bar.appendChild(modeBtn("list", "List"));
     board.appendChild(bar);
+    const chosen = document.createElement("div");
+    chosen.className = "tag-picker-chosen tag-main-chosen";
+    board.appendChild(chosen);
     const picker = createPicker({
       ids: selected,
+      chosenHost: chosen,
       actionText: "Pick",
       mainAction: true,
       hideInput: mode === "list",
@@ -379,6 +412,9 @@
         return applied;
       },
       allowNew: false,
+      onChange: function () {
+        if (mode === "list") paint(lastBoard);
+      },
       onSubmit: function (choices) {
         const ids = choices.map(function (tag) {
           return tag.id;
@@ -390,7 +426,10 @@
     board.appendChild(picker.node);
     if (mode !== "list") return;
     (lastBoard.groups || []).forEach(function (group) {
-      if (!group.tags || !group.tags.length) return;
+      const available = (group.tags || []).filter(function (tag) {
+        return selected.indexOf(tag.id) < 0;
+      });
+      if (!available.length) return;
       const wrap = document.createElement("section");
       wrap.className = "tag-group";
       const closed = collapsed[group.id] === true;
@@ -406,13 +445,11 @@
       if (!closed) {
         const row = document.createElement("div");
         row.className = "tag-row";
-        group.tags.forEach(function (tag) {
+        available.forEach(function (tag) {
           row.appendChild(
-            tagChip(tag, selected.indexOf(tag.id) >= 0, function (picked) {
-              const at = selected.indexOf(picked.id);
-              if (at >= 0) selected.splice(at, 1);
-              else selected.push(picked.id);
-              pickerRefresh();
+            tagChip(tag, false, function (picked) {
+              if (selected.indexOf(picked.id) < 0) selected.push(picked.id);
+              paint(lastBoard);
             })
           );
         });

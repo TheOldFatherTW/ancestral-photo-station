@@ -498,6 +498,7 @@ a.cab {
 }
 .hp-label {
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
   font-size: 13px;
@@ -505,6 +506,10 @@ a.cab {
   letter-spacing: 0.04em;
   color: var(--ink);
   min-height: 22px;
+}
+.hp-text {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 .hp-alt {
   position: relative;
@@ -1000,6 +1005,8 @@ button, .btn {
 .tag-board {
   width: min(720px, 100%);
   margin: 18px auto 0;
+  padding-left: 12px;
+  padding-right: calc(64px + env(safe-area-inset-right, 0px));
   text-align: left;
 }
 .mode-bar {
@@ -1114,6 +1121,9 @@ button.mode-pick[hidden] {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 10px;
+}
+.tag-picker-suggest .tag-chip {
+  touch-action: manipulation;
 }
 .tag-suggest-title {
   width: 100%;
@@ -1498,7 +1508,7 @@ button.mode-pick[hidden] {
 .kb-up .blobs {
   display: none;
 }
-.kb-up #tag-board .tag-picker:not(.no-search):focus-within {
+.kb-up #tag-board .tag-picker:not(.no-search).is-searching {
   position: fixed;
   top: var(--vv-top, 0px);
   right: 0;
@@ -1513,7 +1523,7 @@ button.mode-pick[hidden] {
   justify-content: center;
   pointer-events: none;
 }
-.kb-up #tag-board .tag-picker:not(.no-search):focus-within .tag-picker-card {
+.kb-up #tag-board .tag-picker:not(.no-search).is-searching .tag-picker-card {
   width: min(520px, 100%);
   max-height: calc(100% - 8px);
   overflow: hidden;
@@ -1525,7 +1535,7 @@ button.mode-pick[hidden] {
   flex-direction: column;
   pointer-events: auto;
 }
-.kb-up #tag-board .tag-picker:not(.no-search):focus-within .tag-picker-chosen {
+.kb-up #tag-board .tag-picker:not(.no-search).is-searching .tag-picker-chosen {
   order: 1;
   max-height: 28%;
   overflow-y: auto;
@@ -1533,7 +1543,7 @@ button.mode-pick[hidden] {
   flex: 0 1 auto;
   -webkit-overflow-scrolling: touch;
 }
-.kb-up #tag-board .tag-picker:not(.no-search):focus-within .tag-picker-suggest {
+.kb-up #tag-board .tag-picker:not(.no-search).is-searching .tag-picker-suggest {
   order: 2;
   min-height: 0;
   overflow-y: auto;
@@ -1542,7 +1552,7 @@ button.mode-pick[hidden] {
   flex: 0 1 auto;
   -webkit-overflow-scrolling: touch;
 }
-.kb-up #tag-board .tag-picker:not(.no-search):focus-within .tag-picker-form {
+.kb-up #tag-board .tag-picker:not(.no-search).is-searching .tag-picker-form {
   order: 3;
   padding: 8px;
   flex: 0 0 auto;

@@ -24,7 +24,9 @@
   let upBar = null;
   let upHide = 0;
   const UPLOAD_CAP = 480 * 1024 * 1024;
-  const BATCH_CAP = 40 * 1024 * 1024;
+  // Small enough that a phone finishes one before anything between it and the vault
+  // gives up, and that the bar moves often, since Safari reports no progress of its own.
+  const BATCH_CAP = 12 * 1024 * 1024;
   const TIP_LINES = [
     "一次挑 20～30 張最順。",
     "按下相簿右上角的「加入」以後，iPhone 會自己把每一張照片轉檔，選照片那頁會停住十幾秒到好幾分鐘，畫面看起來像當掉。那是正常的，請等它自己跳回來，不要關掉。",
@@ -361,6 +363,10 @@
       groups.length +
       " 批送。傳完之前請不要鎖螢幕或切到別的 App。";
     let done = 0;
+    const why = [];
+    function blame(word) {
+      if (why.indexOf(word) < 0) why.push(word);
+    }
     try {
       for (let i = 0; i < groups.length; i += 1) {
         const group = groups[i];
@@ -370,34 +376,25 @@
           body.append("photo", f, f.name || "photo.jpg");
           weight += f.size;
         });
-        const head = "上傳中 第 " + (i + 1) + " 批／共 " + groups.length + " 批";
-        paintUp(head, note, total ? done / total : 0);
-        const data = await new Promise(function (resolve) {
-          // fetch cannot report how far a body has got, so a run that takes minutes
-          // through the tunnel would have nothing truthful to put in the bar.
-          const xhr = new XMLHttpRequest();
-          xhr.open("POST", url, true);
-          xhr.upload.onprogress = function (ev) {
-            if (!ev.lengthComputable || !total) return;
-            paintUp(head, note, (done + Math.min(ev.loaded, weight)) / total);
-          };
-          xhr.onload = function () {
-            let out = null;
-            try {
-              out = JSON.parse(xhr.responseText);
-            } catch (e) {}
-            resolve(xhr.status >= 200 && xhr.status < 300 ? out : null);
-          };
-          xhr.onerror = function () {
-            resolve(null);
-          };
-          xhr.send(body);
-        });
-        if (data) {
-          saved += (data.saved || []).length;
-          already += (data.already || []).length;
-          failed += (data.rejected || []).length;
-        } else {
+        paintUp("上傳中 第 " + (i + 1) + " 批／共 " + groups.length + " 批", note, total ? done / total : 0);
+        try {
+          // A plain POST of form data needs no CORS preflight. Asking for byte level
+          // progress does, and Safari does not report that progress anyway, so the
+          // extra round trip would be one more thing to fail for nothing.
+          const res = await fetch(url, { method: "POST", body: body });
+          const data = await res.json().catch(function () {
+            return null;
+          });
+          if (!res.ok || !data) {
+            blame("伺服器回 " + res.status);
+            failed += group.length;
+          } else {
+            saved += (data.saved || []).length;
+            already += (data.already || []).length;
+            failed += (data.rejected || []).length;
+          }
+        } catch (err) {
+          blame("送不出去（" + (err && err.name ? err.name : "不明") + "）");
           failed += group.length;
         }
         done += weight;
@@ -405,7 +402,9 @@
       const bits = [];
       if (saved) bits.push("收進來 " + saved + " 張");
       if (already) bits.push(already + " 張本來就有");
-      if (failed) bits.push(failed + " 張傳不上來，再試一次");
+      if (failed) {
+        bits.push(failed + " 張傳不上來" + (why.length ? "，" + why.join("、") : ""));
+      }
       paintUp(bits.length ? bits.join("，") : "沒有新的照片", "", 1);
       if (saved) {
         lastCab = "";

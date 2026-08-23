@@ -23,6 +23,7 @@
   let ticket = "";
   let appleId = "";
   let busy = false;
+  let codeSent = false;
 
   function api(path, key) {
     const url = ORIGIN + path;
@@ -123,6 +124,7 @@
   function showLanding() {
     hideAllInvite();
     busy = false;
+    codeSent = false;
     if (statusEl) statusEl.textContent = "";
     if (hey) hey.hidden = false;
     if (needsSafari()) {
@@ -135,6 +137,7 @@
   function showPass(err) {
     hideAllInvite();
     busy = false;
+    codeSent = false;
     if (passForm) passForm.hidden = false;
     if (passErr) passErr.textContent = err || "";
     const passEl = document.getElementById("invite-pass");
@@ -217,6 +220,7 @@
           return;
         }
         if (x.j.phase === "failed") {
+          codeSent = false;
           showPass(x.j.error || BAD_PASS);
           return;
         }
@@ -225,7 +229,7 @@
           goToPersonal();
           return;
         }
-        if (x.j.need_mfa) {
+        if (x.j.need_mfa && !codeSent) {
           if (!mfaForm || mfaForm.hidden) showMfa("");
         } else if (!waitEl || waitEl.hidden) {
           showWait();
@@ -284,6 +288,7 @@
       const pass = (document.getElementById("invite-pass") || {}).value || "";
       if (!pass) return;
       busy = true;
+      codeSent = false;
       showWait();
       postJson("/api/invite/login", inviteKey, { apple_id: appleId, password: pass })
         .then(function (x) {
@@ -316,9 +321,11 @@
       postJson("/api/invite/code", inviteKey, { ticket: ticket, code: code })
         .then(function (x) {
           if (!x.res.ok) {
+            codeSent = false;
             showMfa((x.j && x.j.error) || "驗證碼送不出去");
             return;
           }
+          codeSent = true;
           watchAuth();
         })
         .catch(function () {

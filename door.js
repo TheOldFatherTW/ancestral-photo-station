@@ -22,6 +22,7 @@
   let upHide = 0;
   let latestPeople = {};
   let uploadViews = {};
+  let settingsWrap = null;
   const UPLOAD_CAP = 480 * 1024 * 1024;
   // Small enough that a phone finishes one before anything between it and the vault
   // gives up, and that the bar moves often, since Safari reports no progress of its own.
@@ -190,7 +191,7 @@
     if (!solo && albumTitle) albumTitle.textContent = name || names[person] || person;
     if (window.FamilyTags) window.FamilyTags.show(person);
     showRail(true);
-    showSettings(true);
+    showSettings(true, person);
     if (openPerson === person) return;
     openPerson = person;
     if (window.FamilyFeed) window.FamilyFeed.start(person);
@@ -532,7 +533,7 @@
   }
 
   function closeSettings() {
-    const wrap = document.getElementById("album-settings");
+    const wrap = settingsWrap || document.getElementById("album-settings");
     if (!wrap) return;
     const menu = wrap.querySelector(".settings-menu");
     const toggle = wrap.querySelector(".settings-toggle");
@@ -541,9 +542,9 @@
   }
 
   function ensureSettings() {
-    let wrap = document.getElementById("album-settings");
-    if (wrap) return wrap;
-    wrap = document.createElement("div");
+    if (settingsWrap) return settingsWrap;
+    const wrap = document.createElement("div");
+    settingsWrap = wrap;
     wrap.id = "album-settings";
     wrap.className = "album-settings";
     wrap.hidden = true;
@@ -567,7 +568,8 @@
     }
     menu.appendChild(
       entry(CAMERA, "換封面", function () {
-        if (openPerson) pickCover(openPerson);
+        const pid = wrap.dataset.person || openPerson;
+        if (pid) pickCover(pid);
       })
     );
     menu.appendChild(
@@ -594,8 +596,16 @@
     return wrap;
   }
 
-  function showSettings(on) {
+  function showSettings(on, pid) {
     const wrap = ensureSettings();
+    pid = pid || openPerson;
+    if (on && pid && cabs) {
+      const actions = cabs.querySelector(
+        '.cab-hud[data-person="' + pid + '"] .cab-actions'
+      );
+      if (actions && wrap.parentNode !== actions) actions.appendChild(wrap);
+      wrap.dataset.person = pid;
+    }
     wrap.hidden = !on;
     if (!on) closeSettings();
   }
@@ -762,6 +772,9 @@
       (shownLocal
         ? !!shownLocal.done
         : remembered || p.sync === "synced" || p.percent === 100);
+    let busyText = "備份中...";
+    if (!shownLocal && p.backup_phase === "checking") busyText = "核對中...";
+    if (!shownLocal && p.backup_phase === "retry") busyText = "重新連線...";
     paintHp(hud.querySelector('.hp[data-kind="backup"]'), {
       running: showRun,
       done: backupDone,
@@ -770,7 +783,7 @@
       percent: shownLocal && shownLocal.percent != null ? shownLocal.percent : p.percent,
       doneCount: shownLocal ? shownLocal.doneCount : p.backup_done,
       totalCount: shownLocal ? shownLocal.totalCount : p.backup_total,
-      busyText: "備份中...",
+      busyText: busyText,
       doneText: "備份完成",
       waitText: "尚未檢查",
     });

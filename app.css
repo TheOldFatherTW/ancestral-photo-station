@@ -8,7 +8,15 @@
   --rose-soft: #e091b0;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; min-height: 100%; }
+html, body {
+  width: 100%;
+  margin: 0;
+  min-height: 100%;
+  overflow-x: hidden;
+}
+@supports (overflow: clip) {
+  html, body { overflow-x: clip; }
+}
 body {
   background: var(--bg);
   color: var(--ink);
@@ -339,19 +347,16 @@ button.apple-next path {
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: flex-start;
   margin: 0 0 8px;
-  padding: 8px 4px;
-  color: var(--mute);
-  font-size: 13px;
+  padding: 4px 0 8px;
 }
-.trash-bar button {
+.trash-bar button.trash-back {
   margin: 0;
-  width: auto;
-  font-size: 13px;
-  padding: 6px 12px;
-  border-radius: 999px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  flex: 0 0 40px;
 }
 .feed-empty {
   grid-column: 1 / -1;
@@ -360,7 +365,7 @@ button.apple-next path {
   padding: 24px;
 }
 .profile {
-  width: min(420px, 92vw);
+  width: min(420px, 100%);
   text-align: center;
 }
 .rose-two {
@@ -415,7 +420,7 @@ button.apple-next path {
   color: var(--mute);
 }
 .local-cabs {
-  width: min(720px, 94vw);
+  width: min(720px, 100%);
   margin: 36px auto 0;
 }
 .grid {
@@ -854,19 +859,18 @@ a.cab {
 }
 .album-head h2 { margin: 0; }
 .album-settings {
-  position: fixed;
-  top: calc(10px + env(safe-area-inset-top, 0px));
-  right: max(10px, env(safe-area-inset-right, 0px));
+  position: relative;
   z-index: 30;
+  flex: 0 0 40px;
 }
 .album-settings[hidden],
 .settings-menu[hidden] {
   display: none !important;
 }
 .album-settings .settings-toggle {
-  width: 44px;
-  height: 44px;
-  flex-basis: 44px;
+  width: 40px;
+  height: 40px;
+  flex-basis: 40px;
   filter: drop-shadow(0 2px 7px rgba(0, 0, 0, 0.14));
 }
 .album-settings .settings-toggle svg {
@@ -875,7 +879,7 @@ a.cab {
 }
 .settings-menu {
   position: absolute;
-  top: 50px;
+  top: 46px;
   right: 0;
   width: 178px;
   padding: 6px;
@@ -906,6 +910,12 @@ button.settings-entry:active {
   width: 19px;
   height: 19px;
   flex: 0 0 auto;
+}
+.trash-open .cab-actions,
+.trash-open .album-settings,
+.trash-open .tag-board,
+.trash-open .photo-rail {
+  display: none !important;
 }
 .album-tools {
   display: flex;
@@ -988,7 +998,7 @@ button, .btn {
   display: none !important;
 }
 .tag-board {
-  width: min(720px, 94vw);
+  width: min(720px, 100%);
   margin: 18px auto 0;
   text-align: left;
 }
@@ -1014,21 +1024,10 @@ button, .btn {
   box-shadow: inset 0 0 0 1.5px var(--line);
   cursor: pointer;
 }
-.mode-btn.is-on,
-.mode-pick:not(:disabled) {
+.mode-btn.is-on {
   color: #fff;
   box-shadow: none;
   background: linear-gradient(120deg, #fa7e1e 0%, #d62976 48%, #962fbf 100%);
-}
-.mode-pick {
-  margin-left: auto;
-}
-.mode-pick:disabled {
-  color: var(--mute);
-  background: #fff;
-  box-shadow: inset 0 0 0 1.5px var(--line);
-  opacity: 0.55;
-  cursor: default;
 }
 .tag-picker {
   margin: 0 0 14px;
@@ -1073,14 +1072,36 @@ form.tag-picker-form {
   outline: 2px solid rgba(214, 41, 118, 0.16);
   outline-offset: 1px;
 }
-.tag-picker-form .mode-pick,
-.tag-picker-form button[type="submit"] {
+.tag-picker-form button[type="submit"]:not(.tag-submit) {
   flex: 0 0 auto;
   width: auto;
   min-width: 66px;
   height: 40px;
   margin: 0;
   padding: 8px 16px;
+}
+button.tag-submit {
+  flex: 0 0 44px;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+}
+button.tag-submit:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+button.mode-pick {
+  margin-left: auto;
+  animation: tag-submit-in 180ms ease-out;
+}
+button.mode-pick[hidden] {
+  display: none !important;
+}
+@keyframes tag-submit-in {
+  from { opacity: 0; transform: scale(0.72); }
+  to { opacity: 1; transform: scale(1); }
 }
 .tag-picker-suggest {
   display: flex;
@@ -1305,22 +1326,26 @@ form.tag-picker-form {
 }
 .pswp-tag-sheet {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: var(--kb, 0px);
+  inset: 0;
   z-index: 20;
-  padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
-  background: linear-gradient(180deg, rgba(20, 16, 18, 0) 0%, rgba(20, 16, 18, 0.82) 28%, rgba(20, 16, 18, 0.94) 100%);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
   color: #fff;
   pointer-events: none;
+}
+.pswp-tag-card {
+  width: 100%;
+  padding: 28px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, rgba(20, 16, 18, 0) 0%, rgba(20, 16, 18, 0.82) 28%, rgba(20, 16, 18, 0.94) 100%);
+  pointer-events: auto;
 }
 .pswp-tag-sheet.is-searching .pswp-tag-row {
   display: none;
 }
-.pswp-tag-sheet > * {
-  pointer-events: auto;
-}
-.pswp-tag-sheet.is-video {
+.pswp-tag-sheet.is-video .pswp-tag-card {
   padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
 }
 .pswp-tag-sheet[hidden] {
@@ -1380,7 +1405,7 @@ form.tag-picker-form {
 .pswp-tag-add .tag-search-input::placeholder {
   color: rgba(255, 255, 255, 0.55);
 }
-.pswp-tag-add button {
+.pswp-tag-add button:not(.tag-submit) {
   margin: 0;
   width: auto;
   flex: 0 0 auto;
@@ -1416,18 +1441,49 @@ form.tag-picker-form {
 .pswp-tag-suggest .tag-suggest-title {
   color: rgba(255, 255, 255, 0.72);
 }
-/* The keyboard covers the bottom of the window without shrinking it, so the sheet
-   is lifted by however much visualViewport says is hidden. */
-.kb-up .pswp-tag-sheet {
-  pointer-events: auto;
-  max-height: calc(100% - var(--kb, 0px) - 16px);
+.pswp-tag-sheet.is-searching .pswp-tag-card {
+  width: min(520px, calc(100% - 24px));
+  max-height: calc(100% - 16px);
+  margin: 8px 12px;
   overflow-y: auto;
+  padding: 16px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.98);
+  color: var(--ink);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.26);
   -webkit-overflow-scrolling: touch;
-  padding-bottom: 16px;
-  background: rgba(20, 16, 18, 0.96);
 }
-.kb-up .pswp-tag-sheet.is-video {
-  padding-bottom: 16px;
+.pswp-tag-sheet.is-searching .pswp-tag-title,
+.pswp-tag-sheet.is-searching .tag-suggest-title {
+  color: var(--mute);
+}
+.pswp-tag-sheet.is-searching .tag-chip,
+.pswp-tag-sheet.is-searching .pswp-tag-suggest button {
+  background: #fff;
+  color: var(--ink);
+  border-color: var(--line);
+}
+.pswp-tag-sheet.is-searching .pswp-tag-add.tag-picker-form .tag-search-input {
+  border-color: var(--line);
+  background: #fff;
+  color: var(--ink);
+}
+.pswp-tag-sheet.is-searching .pswp-tag-add .tag-search-input::placeholder {
+  color: var(--mute);
+}
+/* A fixed shell follows the visible viewport; only the white card moves, never
+   the PhotoSwipe slide underneath it. */
+.kb-up .pswp-tag-sheet {
+  position: fixed;
+  top: var(--vv-top, 0px);
+  right: 0;
+  bottom: auto;
+  left: 0;
+  height: var(--vvh, 100vh);
+  pointer-events: auto;
+  overflow: visible;
+  padding: 0;
+  background: transparent;
 }
 .kb-up .pswp-face-cube,
 .kb-up .photo-rail {
@@ -1465,18 +1521,29 @@ form.tag-picker-form {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: 20px 12px calc(12px + env(safe-area-inset-bottom, 0px) + var(--kb, 0px));
+  padding: 20px 12px calc(12px + env(safe-area-inset-bottom, 0px));
   background: rgba(0, 0, 0, 0.42);
 }
 .batch-tag-sheet {
   width: min(520px, 100%);
-  max-height: calc(100vh - var(--kb, 0px) - 32px);
+  max-height: calc(100vh - 32px);
   overflow-y: auto;
   padding: 16px;
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 16px 44px rgba(0, 0, 0, 0.26);
   -webkit-overflow-scrolling: touch;
+}
+.kb-up .batch-tag-mask {
+  top: var(--vv-top, 0px);
+  right: 0;
+  bottom: auto;
+  left: 0;
+  height: var(--vvh, 100vh);
+  padding: 8px 12px;
+}
+.kb-up .batch-tag-sheet {
+  max-height: calc(100% - 16px);
 }
 .batch-tag-head {
   display: flex;
@@ -1654,6 +1721,9 @@ button.batch-tag-close {
   .mode-btn { font-size: 10px; padding: 7px 12px; }
 }
 @media (min-width: 600px) and (pointer: coarse) {
+  .tag-board {
+    padding-right: calc(80px + env(safe-area-inset-right, 0px));
+  }
   .photo-rail {
     gap: 18px;
   }
@@ -1685,7 +1755,8 @@ button.batch-tag-close {
   }
   .thinking-five span,
   .hp.is-run .hp-fill,
-  .hp-alt.has-two > span {
+  .hp-alt.has-two > span,
+  button.mode-pick {
     animation: none;
   }
   .hp-alt.has-two .hp-alt-count {

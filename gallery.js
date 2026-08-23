@@ -228,6 +228,7 @@
   function tellSelect(hint) {
     if (hint !== undefined) selectHint = hint || "";
     if (pickCount() > 0) selectHint = "";
+    if (trashMode) return;
     if (window.FamilyDoor && window.FamilyDoor.setSelect) {
       window.FamilyDoor.setSelect(selecting ? pickCount() : 0, trashMode, selectHint);
     }
@@ -248,6 +249,7 @@
   }
 
   function enterSelect(item, tile) {
+    if (trashMode) return;
     selecting = true;
     if (item) {
       const key = itemKey(item);
@@ -259,6 +261,7 @@
   }
 
   function toggleSelect(item, tile) {
+    if (trashMode) return;
     if (!selecting) {
       enterSelect(item, tile);
       return;
@@ -310,6 +313,7 @@
   }
 
   function prepareAction() {
+    if (trashMode) return false;
     if (targetItems().length) return true;
     if (selecting) {
       clearSelect();
@@ -805,21 +809,25 @@
       currentPerson = person;
       currentTags = tagIds;
       trashMode = !!(opts && opts.trash);
+      document.documentElement.classList.toggle("trash-open", trashMode);
       feed.dataset.trash = trashMode ? "1" : "";
       feed.classList.toggle("is-trash", trashMode);
+      if (!trashMode && window.FamilyTags && window.FamilyTags.setApplied) {
+        window.FamilyTags.setApplied(tagIds);
+      }
       if (!opts || !opts.keepSelect) clearSelect();
       if (trashMode) {
-        const bar = document.createElement("p");
+        const bar = document.createElement("div");
         bar.className = "trash-bar";
-        const note = document.createElement("span");
-        note.textContent = "垃圾桶 · 點進照片，刪掉 #delete 即可救回";
         const back = document.createElement("button");
         back.type = "button";
-        back.textContent = "返回相簿";
+        back.className = "ins-icon trash-back";
+        back.setAttribute("aria-label", "返回相簿");
+        back.innerHTML =
+          '<span class="ins-ring"></span><span class="ins-face"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5L8 12l6.5 6.5M8.5 12H20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
         back.addEventListener("click", function () {
           window.FamilyFeed.closeTrash();
         });
-        bar.appendChild(note);
         bar.appendChild(back);
         feed.appendChild(bar);
       }
@@ -842,6 +850,7 @@
       }
 
       function tile(item, index) {
+        item.trash = trashMode;
         const a = document.createElement("div");
         a.className = "tile" + (item.kind === "video" ? " is-video" : "");
         a.setAttribute("role", "button");
@@ -868,6 +877,7 @@
           }
         }
         a.addEventListener("pointerdown", function (ev) {
+          if (trashMode) return;
           if (ev.button && ev.button !== 0) return;
           sx = ev.clientX;
           sy = ev.clientY;
@@ -1012,6 +1022,7 @@
       return prepareAction();
     },
     trashSelected: function () {
+      if (trashMode) return Promise.resolve();
       const rows = targetRows();
       if (!rows.length) {
         prepareAction();
@@ -1054,6 +1065,7 @@
       });
     },
     tagSelected: function (choices) {
+      if (trashMode) return Promise.resolve();
       const rows = targetRows();
       const list = Array.isArray(choices) ? choices : [choices];
       const ids = [];
@@ -1103,6 +1115,7 @@
       );
     },
     downloadSelected: function () {
+      if (trashMode) return Promise.resolve();
       if (!prepareAction()) return Promise.resolve();
       return saveItems(targetItems());
     },
@@ -1128,6 +1141,7 @@
       afterThumbs = function () {};
       currentPerson = "";
       trashMode = false;
+      document.documentElement.classList.remove("trash-open");
       beforeTrashTags = [];
       clearSelect();
       dropBlobs();

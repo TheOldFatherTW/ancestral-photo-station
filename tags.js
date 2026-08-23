@@ -2,8 +2,11 @@
   const board = document.getElementById("tag-board");
   const RENAMEABLE = { person: 1, place_country: 1, place_city: 1, custom: 1 };
   const DELETE_ID = "media:delete";
+  const ARROW =
+    '<svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="18"/><path d="M15.2 11.5L22.5 18l-7.3 6.5"/></svg>';
   let person = "";
   let selected = [];
+  let applied = [];
   let collapsed = { "地點": true, "類型": true, "自訂": true, "人物": true };
   let mode = "basic";
   let lastBoard = { groups: [], job: {} };
@@ -136,7 +139,29 @@
     input.spellcheck = false;
     input.setAttribute("enterkeyhint", "done");
     input.className = "tag-search-input";
+    input.addEventListener("pointerdown", function (ev) {
+      const ios =
+        /iPad|iPhone|iPod/.test(navigator.userAgent || "") ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      if (!ios || document.activeElement === input) return;
+      ev.preventDefault();
+      try {
+        input.focus({ preventScroll: true });
+      } catch (e) {
+        input.focus();
+      }
+    });
     return input;
+  }
+
+  function submitArrow(label, extraClass) {
+    const button = document.createElement("button");
+    button.type = "submit";
+    button.className = "apple-next tag-submit" + (extraClass ? " " + extraClass : "");
+    button.setAttribute("aria-label", label);
+    button.title = label;
+    button.innerHTML = ARROW;
+    return button;
   }
 
   function tagChip(tag, on, choose) {
@@ -150,6 +175,34 @@
       choose(tag);
     });
     return chip;
+  }
+
+  function removableTagChip(tag, remove) {
+    const wrap = document.createElement("span");
+    wrap.className = "tag-chip-wrap is-on";
+    wrap.dataset.id = tag.id;
+    wrap.appendChild(tagChip(tag, true, remove));
+    const x = document.createElement("button");
+    x.type = "button";
+    x.className = "ins-x";
+    x.setAttribute("aria-label", "取消 #" + tag.label);
+    x.textContent = "×";
+    x.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      remove(tag);
+    });
+    wrap.appendChild(x);
+    return wrap;
+  }
+
+  function tagKey(ids) {
+    return (ids || []).slice().sort().join(",");
+  }
+
+  function setBoardInert(on) {
+    if (!board) return;
+    board.toggleAttribute("inert", !!on);
   }
 
   function renderSuggestions(host, query, opts, choose) {
@@ -174,10 +227,7 @@
     form.className = "tag-picker-form";
     form.autocomplete = "off";
     const input = tagInput("搜尋標籤");
-    const go = document.createElement("button");
-    go.type = "submit";
-    go.className = "mode-btn mode-pick";
-    go.textContent = opts.actionText;
+    const go = submitArrow(opts.actionText, opts.mainAction ? "mode-pick" : "");
     const suggest = document.createElement("div");
     suggest.className = "tag-picker-suggest";
     form.appendChild(input);
@@ -213,7 +263,7 @@
         const tag = tagById(id);
         if (tag) {
           chosen.appendChild(
-            tagChip(tag, true, function (picked) {
+            removableTagChip(tag, function (picked) {
               toggle(picked, false);
             })
           );
@@ -238,6 +288,11 @@
       board.querySelectorAll(".tag-row .tag-chip").forEach(function (chip) {
         chip.classList.toggle("is-on", ids().indexOf(chip.dataset.tagId) >= 0);
       });
+      const dirty = opts.appliedIds && tagKey(ids()) !== tagKey(opts.appliedIds());
+      go.hidden = !!opts.mainAction && !dirty;
+      if (!opts.mainAction) {
+        go.disabled = !ids().length && !String(input.value || "").trim();
+      }
     }
 
     input.addEventListener("focus", refresh);
@@ -249,6 +304,7 @@
         return String(tag.label || "").toLowerCase() === label.toLowerCase();
       })[0];
       if (exact && ids().indexOf(exact.id) < 0) ids().push(exact.id);
+      refresh();
       const choices = ids()
         .map(tagById)
         .filter(Boolean);
@@ -288,6 +344,10 @@
     const picker = createPicker({
       ids: selected,
       actionText: "Pick",
+      mainAction: true,
+      appliedIds: function () {
+        return applied;
+      },
       allowNew: false,
       onSubmit: function (choices) {
         const ids = choices.map(function (tag) {
@@ -361,6 +421,7 @@
   function closeBatch() {
     if (batchSheet) batchSheet.remove();
     batchSheet = null;
+    setBoardInert(false);
     document.documentElement.classList.remove("tag-modal-open");
   }
 
@@ -404,8 +465,8 @@
     });
     document.body.appendChild(mask);
     batchSheet = mask;
+    setBoardInert(true);
     document.documentElement.classList.add("tag-modal-open");
-    picker.input.focus();
   }
 
   function ensureSheet() {
@@ -511,13 +572,25 @@
     const node = hostSheet();
     node.classList.remove("is-searching");
     node.innerHTML = "";
+    const card = document.createElement("div");
+    card.className = "pswp-tag-card";
+    node.appendChild(card);
     const title = document.createElement("p");
     title.className = "pswp-tag-title";
-    title.textContent = sheetItem && sheetItem.kind === "video" ? "這支的標記" : "這張的標記";
-    node.appendChild(title);
+    title.textContent = sheetItem && sheetItem.trash
+      ? "垃圾桶"
+      : sheetItem && sheetItem.kind === "video"
+        ? "這支的標記"
+        : "這張的標記";
+    card.appendChild(title);
     const row = document.createElement("div");
     row.className = "pswp-tag-row";
-    const tags = (data && data.photo && data.photo.tags) || [];
+    const photoTags = (data && data.photo && data.photo.tags) || [];
+    const tags = sheetItem && sheetItem.trash
+      ? photoTags.filter(function (tag) {
+          return tag && tag.id === DELETE_ID;
+        })
+      : photoTags;
     const onPhoto = {};
     tags.forEach(function (tag) {
       if (tag && tag.id) onPhoto[tag.id] = true;
@@ -545,9 +618,7 @@
     form.className = "pswp-tag-add tag-picker-form";
     form.autocomplete = "off";
     const input = tagInput("搜尋標籤");
-    const go = document.createElement("button");
-    go.type = "submit";
-    go.textContent = "新增";
+    const go = submitArrow("新增");
     const suggest = document.createElement("div");
     suggest.className = "pswp-tag-suggest tag-picker-suggest";
 
@@ -652,14 +723,16 @@
 
     function exitRename() {
       renaming = null;
-      go.textContent = "新增";
+      go.setAttribute("aria-label", "新增");
+      go.title = "新增";
       input.value = "";
       renderSuggest();
     }
 
     function enterRename(tag) {
       renaming = tag;
-      go.textContent = "改名";
+      go.setAttribute("aria-label", "改名");
+      go.title = "改名";
       input.value =
         tag.kind === "person" && tag.auto && /^p\d+$/i.test(String(tag.label || ""))
           ? ""
@@ -686,7 +759,11 @@
 
     tags.forEach(function (tag) {
       const wrap = document.createElement("span");
-      wrap.className = "tag-chip-wrap" + (RENAMEABLE[tag.kind] ? "" : " is-lock");
+      const restore = !!(sheetItem && sheetItem.trash && tag.id === DELETE_ID);
+      wrap.className =
+        "tag-chip-wrap" +
+        (RENAMEABLE[tag.kind] ? "" : " is-lock") +
+        (restore ? " is-on" : "");
       wrap.dataset.id = tag.id;
       const chip = document.createElement("button");
       chip.type = "button";
@@ -698,7 +775,7 @@
       x.className = "ins-x";
       x.setAttribute("aria-label", "刪除標記");
       x.textContent = "×";
-      x.hidden = true;
+      x.hidden = !restore;
       x.addEventListener("click", function (ev) {
         ev.preventDefault();
         ev.stopPropagation();
@@ -723,7 +800,11 @@
       wrap.appendChild(x);
       row.appendChild(wrap);
     });
-    node.appendChild(row);
+    card.appendChild(row);
+    if (sheetItem && sheetItem.trash) {
+      paintFaces([]);
+      return;
+    }
 
     let addClick = false;
     go.addEventListener("pointerdown", function () {
@@ -782,8 +863,8 @@
     });
     form.appendChild(input);
     form.appendChild(go);
-    node.appendChild(form);
-    node.appendChild(suggest);
+    card.appendChild(form);
+    card.appendChild(suggest);
     const shipped = (data && data.photo && data.photo.faces) || [];
     // The tag sheet and the face boxes are fetched side by side, so whichever
     // lands second must not wipe out boxes the other one already drew.
@@ -1028,7 +1109,13 @@
     node.innerHTML = "";
     node.hidden = false;
     node.classList.toggle("is-video", item.kind === "video");
-    hostFaceCube();
+    node.classList.toggle("is-trash-photo", !!item.trash);
+    setBoardInert(true);
+    if (item.trash) {
+      if (faceCube) faceCube.hidden = true;
+    } else {
+      hostFaceCube();
+    }
     if (faceCtrl) faceCtrl.abort();
     faceCtrl = new AbortController();
     const ac = faceCtrl;
@@ -1044,7 +1131,7 @@
         if (stillOn(item)) paintSheet(data, drewFaces);
       })
       .catch(function () {});
-    if (item.kind === "video") return;
+    if (item.kind === "video" || item.trash) return;
     api("/api/faces?" + query, { signal: ac.signal })
       .then(function (res) {
         return res.json();
@@ -1062,6 +1149,7 @@
     if (faceCtrl) faceCtrl.abort();
     if (sheet) sheet.hidden = true;
     if (faceCube) faceCube.hidden = true;
+    setBoardInert(false);
     clearFaces();
   }
 
@@ -1085,8 +1173,20 @@
     let lastLift = -1;
     let revealTimer = 0;
     let closeTimer = 0;
+    let lastHeight = -1;
+    let lastTop = -1;
     function sync() {
       const lift = Math.max(0, window.innerHeight - vv.height);
+      const height = Math.round(vv.height);
+      const top = Math.round(vv.offsetTop);
+      if (Math.abs(height - lastHeight) >= 2 || lastHeight < 0) {
+        lastHeight = height;
+        document.documentElement.style.setProperty("--vvh", height + "px");
+      }
+      if (Math.abs(top - lastTop) >= 2 || lastTop < 0) {
+        lastTop = top;
+        document.documentElement.style.setProperty("--vv-top", top + "px");
+      }
       if (!keyboardUp && lift > 100) {
         if (closeTimer) window.clearTimeout(closeTimer);
         closeTimer = 0;
@@ -1118,6 +1218,7 @@
       revealTimer = window.setTimeout(function () {
         revealTimer = 0;
         sync();
+        if (target.closest(".batch-tag-mask, .pswp")) return;
         if (!keyboardUp || document.activeElement !== target || !target.scrollIntoView) return;
         const box = target.getBoundingClientRect();
         const visibleBottom = vv.offsetTop + vv.height;
@@ -1136,6 +1237,7 @@
       person = who;
       mode = "basic";
       selected = [];
+      applied = [];
       load();
     },
     showPhoto: function (item) {
@@ -1148,6 +1250,11 @@
     beforePhotoChange: beforePhotoChange,
     refreshPhoto: refreshPhoto,
     openBatch: openBatch,
+    setApplied: function (ids) {
+      applied = (ids || []).slice();
+      selected.splice.apply(selected, [0, selected.length].concat(applied));
+      pickerRefresh();
+    },
     accept: accept,
     act: post,
     DELETE_ID: DELETE_ID,

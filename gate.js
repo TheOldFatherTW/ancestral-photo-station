@@ -532,6 +532,7 @@
     function reveal() {
       const focused = document.activeElement;
       if (!focused || (focused.tagName !== "INPUT" && focused.tagName !== "TEXTAREA")) return;
+      if (focused.classList && focused.classList.contains("tag-search-input")) return;
       if (!fieldCovered(focused) || !focused.scrollIntoView) return;
       focused.scrollIntoView({ block: "nearest" });
     }

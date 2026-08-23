@@ -784,7 +784,11 @@
       return;
     }
     if (!window.FAMILY_VIEW_KEY) {
-      fail(NEED_LINK);
+      fail(
+        window.navigator.standalone
+          ? "請刪掉圖示，用 Safari 打開專用連結後再加入"
+          : NEED_LINK
+      );
       if (cabs) cabs.innerHTML = "";
       lastCab = "";
       return;

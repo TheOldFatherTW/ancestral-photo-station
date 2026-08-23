@@ -14,7 +14,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600&display=swap" rel="stylesheet"/>
 <link rel="icon" href="./rose-two.svg" type="image/svg+xml"/>
 <link rel="apple-touch-icon" href="./icons/rose-two-180.png"/>
-<link rel="manifest" href="./manifest.webmanifest?v=34"/>
+<link rel="manifest" href="./manifest.webmanifest?v=35"/>
 <link rel="stylesheet" href="./vendor/photoswipe/photoswipe.css"/>
 <link rel="stylesheet" href="./app.css?v=55"/>
 <script src="./config.js?v=1787366995"></script>
@@ -24,7 +24,7 @@
   try { stored = localStorage.getItem("family.viewKey") || ""; } catch (e) {}
   var q = new URLSearchParams(location.search).get("k") || "";
   window.FAMILY_URL_KEY = /^[A-Za-z0-9_-]{8,128}$/.test(q) ? q : "";
-  window.FAMILY_VIEW_KEY = window.FAMILY_URL_KEY ? "" : stored;
+  window.FAMILY_VIEW_KEY = window.FAMILY_URL_KEY || stored;
   window.FAMILY_SKIP_BOOT = true;
   var origin = window.VAULT_ORIGIN;
   if (origin) {
@@ -114,8 +114,8 @@
 <script src="./rose-two.js?v=22"></script>
 <script src="./gallery.js?v=44"></script>
 <script src="./tags.js?v=43"></script>
-<script src="./gate.js?v=8"></script>
-<script src="./door.js?v=49"></script>
+<script src="./gate.js?v=9"></script>
+<script src="./door.js?v=50"></script>
 <script>
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js?v=44");

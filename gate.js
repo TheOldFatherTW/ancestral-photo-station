@@ -62,6 +62,52 @@
     });
   }
 
+  function writeInstallManifest(token) {
+    if (!KEY_RE.test(token || "")) return;
+    const start = new URL("./", location.href);
+    start.searchParams.set("k", token);
+    const icon = function (file, size) {
+      return {
+        src: new URL("./icons/" + file, location.href).href,
+        sizes: size,
+        type: "image/png",
+        purpose: "any",
+      };
+    };
+    const manifest = {
+      id: start.pathname + start.search,
+      name: "Famiphoto",
+      short_name: "Famiphoto",
+      start_url: start.href,
+      scope: new URL("./", location.href).href,
+      display: "standalone",
+      display_override: ["standalone", "minimal-ui"],
+      capture_links: "none",
+      background_color: "#fafafa",
+      theme_color: "#fafafa",
+      lang: "zh-Hant",
+      icons: [
+        icon("rose-two-192.png", "192x192"),
+        icon("rose-two-512.png", "512x512"),
+      ],
+    };
+    const link = document.querySelector('link[rel="manifest"]');
+    if (!link) return;
+    link.setAttribute(
+      "href",
+      "data:application/manifest+json," + encodeURIComponent(JSON.stringify(manifest))
+    );
+  }
+
+  function keepUrlKey(token) {
+    if (!KEY_RE.test(token || "")) return;
+    window.FAMILY_URL_KEY = token;
+    const next = location.pathname + "?k=" + encodeURIComponent(token) + (location.hash || "");
+    if (location.pathname + location.search + (location.hash || "") !== next) {
+      history.replaceState({}, "", next);
+    }
+  }
+
   function savePersonal(token) {
     if (!KEY_RE.test(token || "")) return;
     window.FAMILY_VIEW_KEY = token;
@@ -71,11 +117,19 @@
     try {
       sessionStorage.removeItem("family.claim");
     } catch (e) {}
-    history.replaceState({}, "", location.pathname + (location.hash || ""));
+    writeInstallManifest(token);
+    // iPhone Safari and the home-screen app do not share storage. The icon must
+    // launch with ?k= or it is an empty shell. Keep the key in the URL / manifest
+    // on iPhone Safari so "Add to Home Screen" captures the personal link.
+    if (typeof navigator.standalone === "boolean" && !navigator.standalone) {
+      keepUrlKey(token);
+      return;
+    }
+    stripUrlKey();
   }
 
   function stripUrlKey() {
-    if (!window.FAMILY_URL_KEY) return;
+    if (!window.FAMILY_URL_KEY && !(location.search || "").match(/(^|[?&])k=/)) return;
     history.replaceState({}, "", location.pathname + (location.hash || ""));
     window.FAMILY_URL_KEY = "";
   }
@@ -396,13 +450,7 @@
           startInvite(probe);
           return;
         }
-        if (urlK) {
-          window.FAMILY_VIEW_KEY = urlK;
-          try {
-            localStorage.setItem("family.viewKey", urlK);
-          } catch (e) {}
-          stripUrlKey();
-        }
+        savePersonal(probe);
         openAlbum();
         showHomeInstallIfNeeded();
       })

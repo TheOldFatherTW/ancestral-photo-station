@@ -60,7 +60,7 @@
     const ctrl = new AbortController();
     const timer = setTimeout(function () {
       ctrl.abort();
-    }, 6000);
+    }, 20000);
     try {
       const res = await fetch(api(path), { signal: ctrl.signal });
       if (res.status === 401 || res.status === 403) {
@@ -975,7 +975,12 @@
         return p.tag && p.tag.state === "running";
       });
     } catch (err) {
-      fail(err && err.code === "need_key" ? NEED_LINK : DISCONNECTED);
+      if (err && err.code === "need_key") {
+        fail(NEED_LINK);
+        return;
+      }
+      if (lastCab) return;
+      fail(DISCONNECTED);
     }
     route();
   }

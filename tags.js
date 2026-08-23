@@ -215,7 +215,11 @@
     title.textContent = opts && opts.kind === "person" ? "建議的人物" : "建議的標籤";
     host.appendChild(title);
     hits.forEach(function (tag) {
-      host.appendChild(tagChip(tag, false, choose));
+      const chip = tagChip(tag, false, choose);
+      chip.addEventListener("pointerdown", function (ev) {
+        ev.preventDefault();
+      });
+      host.appendChild(chip);
     });
   }
 

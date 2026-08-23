@@ -20,18 +20,12 @@
   let uploadPerson = "";
   let uploadBtn = null;
   let uploadBusy = false;
-  let uploadTip = null;
   let upBar = null;
   let upHide = 0;
   const UPLOAD_CAP = 480 * 1024 * 1024;
   // Small enough that a phone finishes one before anything between it and the vault
   // gives up, and that the bar moves often, since Safari reports no progress of its own.
   const BATCH_CAP = 12 * 1024 * 1024;
-  const TIP_LINES = [
-    "一次挑 20～30 張最順。",
-    "按下相簿右上角的「加入」以後，iPhone 會自己把每一張照片轉檔，選照片那頁會停住十幾秒到好幾分鐘，畫面看起來像當掉。那是正常的，請等它自己跳回來，不要關掉。",
-    "想快很多：在選照片那頁的右上角按「選項」，把「格式」從「自動」改成「目前」。這樣 iPhone 就不轉檔，直接交出原檔，家裡那台照收。",
-  ];
   let backupAsk = {};
   const CAMERA =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="8" width="17" height="11.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 8l1.4-2.4h5.2L16 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="13.6" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>';
@@ -249,55 +243,12 @@
   function pickUpload(person, btn) {
     uploadPerson = person;
     uploadBtn = btn || null;
-    openTip();
+    openPicker();
   }
 
-  // iOS hands the pictures over in "compatible" format whatever the accept attribute
-  // says, so it re-encodes every HEIC before the picker will close. That wait looks
-  // exactly like a dead button, and the only cure is knowing it is coming.
-  function openTip() {
-    if (!uploadTip) {
-      uploadTip = document.createElement("div");
-      uploadTip.className = "up-tip";
-      uploadTip.hidden = true;
-      const card = document.createElement("div");
-      card.className = "up-card";
-      const head = document.createElement("h3");
-      head.textContent = "手動上傳照片";
-      card.appendChild(head);
-      TIP_LINES.forEach(function (line) {
-        const p = document.createElement("p");
-        p.textContent = line;
-        card.appendChild(p);
-      });
-      const btns = document.createElement("div");
-      btns.className = "up-card-btns";
-      const skip = document.createElement("button");
-      skip.type = "button";
-      skip.className = "up-skip";
-      skip.textContent = "先不要";
-      skip.addEventListener("click", function () {
-        uploadTip.hidden = true;
-      });
-      const go = document.createElement("button");
-      go.type = "button";
-      go.className = "up-go";
-      go.textContent = "選照片";
-      // Reading the card takes longer than the few seconds iOS keeps a tap valid for,
-      // so the picker has to open off this button rather than off the one behind it.
-      go.addEventListener("click", function () {
-        uploadTip.hidden = true;
-        openPicker();
-      });
-      btns.appendChild(skip);
-      btns.appendChild(go);
-      card.appendChild(btns);
-      uploadTip.appendChild(card);
-      document.body.appendChild(uploadTip);
-    }
-    uploadTip.hidden = false;
-  }
-
+  // iOS re-encodes every HEIC before it will part with a pick, and keeps its own picker
+  // on screen until the last one is done. Nothing here runs or can be seen during that
+  // wait, so the strip below can only start once the pictures are already in hand.
   function openPicker() {
     if (!uploadInput) {
       uploadInput = document.createElement("input");

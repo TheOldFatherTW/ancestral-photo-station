@@ -553,6 +553,12 @@
     }
     cover.appendChild(ring);
     cover.appendChild(face);
+    const work = document.createElement("div");
+    work.className = "cab-progress";
+    work.hidden = true;
+    work.innerHTML =
+      '<div class="thinking-five" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><div class="cab-progress-bar"></div>';
+    cover.appendChild(work);
     a.appendChild(cover);
     wrap.appendChild(a);
     const pick = insButton("cab-pick", CAMERA, p.has_cover ? "換封面" : "選封面");
@@ -604,7 +610,13 @@
     mark.className = "hp-check";
     mark.hidden = true;
     mark.innerHTML = CHECK;
+    const think = document.createElement("div");
+    think.className = "thinking-five hp-think";
+    think.setAttribute("aria-hidden", "true");
+    think.innerHTML = "<span></span><span></span><span></span><span></span><span></span>";
+    think.hidden = true;
     label.appendChild(text);
+    label.appendChild(think);
     label.appendChild(mark);
     const meter = document.createElement("div");
     meter.className = "hp-meter";
@@ -661,6 +673,13 @@
     if (refresh) refresh.classList.toggle("is-run", showRun);
     const cover = hud.querySelector(".cab-cover");
     if (cover) cover.classList.toggle("is-run", showRun);
+    const work = hud.querySelector(".cab-progress");
+    if (work) {
+      work.hidden = !showRun;
+      if (showRun && window.RoseTwo && window.RoseTwo.mountBar) {
+        window.RoseTwo.mountBar(work.querySelector(".cab-progress-bar"));
+      }
+    }
   }
 
   function paintHp(row, view) {
@@ -679,13 +698,16 @@
           : view.waitText;
     }
     if (mark) mark.hidden = !view.done;
-    if (fill) fill.style.width = (view.done ? 100 : shown == null ? 0 : shown) + "%";
+    const think = row.querySelector(".hp-think");
+    if (think) think.hidden = !view.running;
+    if (fill) fill.style.width = (view.done ? 100 : shown == null ? (view.running ? 42 : 0) : shown) + "%";
     if (num) {
       if (view.done) num.textContent = "";
       else if (shown == null) num.textContent = view.running ? "…" : "";
       else num.textContent = shown + "%";
     }
     row.classList.toggle("is-run", !!view.running);
+    row.classList.toggle("is-wait", !!view.running && shown == null);
     row.classList.toggle("is-done", !!view.done);
   }
 
@@ -703,6 +725,26 @@
       localStorage.removeItem("family.backupDone." + person);
     } catch (e) {}
     if (btn) btn.classList.add("is-run");
+    const hud = cabs && cabs.querySelector('.cab-hud[data-person="' + person + '"]');
+    if (hud) {
+      const cover = hud.querySelector(".cab-cover");
+      if (cover) cover.classList.add("is-run");
+      const work = hud.querySelector(".cab-progress");
+      if (work) {
+        work.hidden = false;
+        if (window.RoseTwo && window.RoseTwo.mountBar) {
+          window.RoseTwo.mountBar(work.querySelector(".cab-progress-bar"));
+        }
+      }
+      paintHp(hud.querySelector('.hp[data-kind="backup"]'), {
+        running: true,
+        done: false,
+        percent: null,
+        busyText: "自動備份中…",
+        doneText: "備份完成",
+        waitText: "尚未檢查",
+      });
+    }
     fetch(api("/api/sync?person=" + encodeURIComponent(person)), { method: "POST" })
       .then(function (res) {
         return res.json().then(function (j) {

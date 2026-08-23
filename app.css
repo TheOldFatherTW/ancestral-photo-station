@@ -504,6 +504,41 @@ a.cab {
   width: 18px;
   height: 18px;
 }
+.hp-think {
+  height: 14px;
+  margin: 0;
+  gap: 5px;
+}
+.hp-think span {
+  width: 6px;
+  height: 6px;
+}
+.hp.is-run .hp-fill {
+  background-image:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.4) 48%,
+      rgba(255, 255, 255, 0) 100%
+    ),
+    linear-gradient(180deg, #e85aa0 0%, var(--rose) 62%, #a3266b 100%);
+  background-size: 220% 100%, 100% 100%;
+  animation: hp-sheen 1.1s linear infinite;
+}
+.hp[data-kind="tag"].is-run .hp-fill {
+  background-image:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.4) 48%,
+      rgba(255, 255, 255, 0) 100%
+    ),
+    linear-gradient(180deg, #f0c078 0%, #e0a04a 62%, #c4842e 100%);
+}
+@keyframes hp-sheen {
+  from { background-position: 120% 0; }
+  to { background-position: -120% 0; }
+}
 .hp-meter {
   display: flex;
   align-items: center;
@@ -713,20 +748,32 @@ a.cab {
 }
 .cab-progress {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 4px;
   z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  gap: 2px;
-  padding: 14px 16px 8px;
-  max-height: 48%;
-  background: linear-gradient(180deg, rgba(250, 250, 250, 0) 0%, rgba(250, 250, 250, 0.78) 42%, rgba(250, 250, 250, 0.92) 100%);
+  gap: 6px;
+  padding: 0 16% 16%;
+  max-height: none;
+  border-radius: 50%;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(250, 250, 250, 0) 28%, rgba(250, 250, 250, 0.72) 62%, rgba(250, 250, 250, 0.94) 100%);
   color: var(--rose);
   pointer-events: none;
+}
+.cab-progress[hidden] {
+  display: none !important;
+}
+.cab-progress .thinking-five {
+  height: 16px;
+  margin: 0;
+  gap: 6px;
+}
+.cab-progress .thinking-five span {
+  width: 7px;
+  height: 7px;
 }
 .cab-progress .rose-mini {
   width: 24%;
@@ -1333,6 +1380,10 @@ html.kb-up body {
 @media (prefers-reduced-motion: reduce) {
   .cab-cover.is-run .cab-ring,
   .ins-icon.is-run .ins-ring {
+    animation: none;
+  }
+  .thinking-five span,
+  .hp.is-run .hp-fill {
     animation: none;
   }
   .blobs span {

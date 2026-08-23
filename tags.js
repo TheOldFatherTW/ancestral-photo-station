@@ -215,10 +215,15 @@
     title.textContent = opts && opts.kind === "person" ? "建議的人物" : "建議的標籤";
     host.appendChild(title);
     hits.forEach(function (tag) {
-      const chip = tagChip(tag, false, choose);
-      chip.addEventListener("pointerdown", function (ev) {
-        ev.preventDefault();
-      });
+      let done = false;
+      function pick(ev) {
+        if (ev) ev.preventDefault();
+        if (done) return;
+        done = true;
+        choose(tag);
+      }
+      const chip = tagChip(tag, false, pick);
+      chip.addEventListener("pointerdown", pick);
       host.appendChild(chip);
     });
   }
@@ -293,7 +298,13 @@
           input.value,
           { exceptIds: exceptIds, hideAutoPeople: !input.value },
           function (picked) {
-            toggle(picked, true);
+            toggle(picked, !opts.mainAction);
+            if (!opts.mainAction) return;
+            if (blurTimer) window.clearTimeout(blurTimer);
+            blurTimer = 0;
+            root.classList.remove("is-searching");
+            suggest.innerHTML = "";
+            input.blur();
           }
         );
       } else {

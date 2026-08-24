@@ -21,6 +21,8 @@
   let selectedTag = null;
   let pickerRefresh = function () {};
   let batchSheet = null;
+  let listSheet = null;
+  let listBody = null;
   let lastLoadAt = 0;
 
   function api(path, opts) {
@@ -416,6 +418,7 @@
   }
 
   function backToAll() {
+    closeList();
     if (
       mode === "all" &&
       modeActive === "all" &&
@@ -442,10 +445,8 @@
         backToAll();
         return;
       }
-      if (mode === id && modeActive === id) return;
-      mode = id;
-      modeActive = id;
-      paint(lastBoard);
+      if (listSheet) return;
+      openList();
     });
     return btn;
   }
@@ -471,7 +472,6 @@
       chosenHost: chosen,
       actionText: "Pick",
       mainAction: true,
-      hideInput: mode === "list",
       appliedIds: function () {
         return applied;
       },
@@ -481,7 +481,6 @@
           backToAll();
           return;
         }
-        if (mode === "list") paint(lastBoard);
       },
       onSubmit: function (choices) {
         const ids = choices.map(function (tag) {
@@ -491,18 +490,66 @@
           backToAll();
           return;
         }
-        const closeList = mode === "list";
-        if (closeList) {
-          mode = "all";
-          modeActive = "";
-        }
         if (window.FamilyFeed) window.FamilyFeed.filter(ids);
-        if (closeList) paint(lastBoard);
       },
     });
     pickerRefresh = picker.refresh;
     board.appendChild(picker.node);
-    if (modeActive !== "list") return;
+  }
+
+  function load() {
+    if (!person) return;
+    lastLoadAt = Date.now();
+    api("/api/tags?person=" + encodeURIComponent(person))
+      .then(function (res) {
+        return res.json();
+      })
+      .then(function (data) {
+        const active = document.activeElement;
+        if (
+          batchSheet ||
+          listSheet ||
+          (active && active.classList && active.classList.contains("tag-search-input"))
+        ) {
+          lastBoard = data || lastBoard;
+          if (listSheet && listBody) fillListGroups(listBody);
+          return;
+        }
+        paint(data);
+      })
+      .catch(function () {});
+  }
+
+  function accept(payload) {
+    if (payload && payload.groups) {
+      if (listSheet && listBody) {
+        lastBoard = payload;
+        fillListGroups(listBody);
+        return payload;
+      }
+      paint(payload);
+    }
+    return payload;
+  }
+
+  function restoreHomeMode() {
+    mode = "all";
+    modeActive = applied.length ? "" : "all";
+  }
+
+  function closeList() {
+    if (listSheet) listSheet.remove();
+    listSheet = null;
+    listBody = null;
+    if (!batchSheet) {
+      setBoardInert(false);
+      document.documentElement.classList.remove("tag-modal-open");
+    }
+    if (mode === "list") restoreHomeMode();
+  }
+
+  function fillListGroups(host) {
+    host.innerHTML = "";
     (lastBoard.groups || []).forEach(function (group) {
       const available = (group.tags || []).filter(function (tag) {
         return selected.indexOf(tag.id) < 0;
@@ -517,7 +564,7 @@
       head.textContent = (closed ? "▸ " : "▾ ") + group.title;
       head.addEventListener("click", function () {
         collapsed[group.id] = !closed;
-        paint(lastBoard);
+        fillListGroups(host);
       });
       wrap.appendChild(head);
       if (!closed) {
@@ -527,50 +574,71 @@
           row.appendChild(
             tagChip(tag, false, function (picked) {
               if (selected.indexOf(picked.id) < 0) selected.push(picked.id);
+              closeList();
               paint(lastBoard);
             })
           );
         });
         wrap.appendChild(row);
       }
-      board.appendChild(wrap);
+      host.appendChild(wrap);
     });
   }
 
-  function load() {
-    if (!person) return;
-    lastLoadAt = Date.now();
-    api("/api/tags?person=" + encodeURIComponent(person))
-      .then(function (res) {
-        return res.json();
-      })
-      .then(function (data) {
-        const active = document.activeElement;
-        if (
-          batchSheet ||
-          (active && active.classList && active.classList.contains("tag-search-input"))
-        ) {
-          lastBoard = data || lastBoard;
-          return;
-        }
-        paint(data);
-      })
-      .catch(function () {});
-  }
-
-  function accept(payload) {
-    if (payload && payload.groups) paint(payload);
-    return payload;
+  function openList() {
+    closeBatch();
+    closeList();
+    mode = "list";
+    modeActive = "list";
+    updateModeButtons();
+    const mask = document.createElement("div");
+    mask.className = "batch-tag-mask list-tag-mask";
+    const card = document.createElement("div");
+    card.className = "batch-tag-sheet list-tag-sheet";
+    const head = document.createElement("div");
+    head.className = "batch-tag-head";
+    const title = document.createElement("p");
+    title.textContent = "List";
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "batch-tag-close";
+    close.setAttribute("aria-label", "關閉");
+    close.textContent = "×";
+    close.addEventListener("click", function () {
+      closeList();
+      updateModeButtons();
+    });
+    head.appendChild(title);
+    head.appendChild(close);
+    const body = document.createElement("div");
+    body.className = "list-tag-body";
+    fillListGroups(body);
+    card.appendChild(head);
+    card.appendChild(body);
+    mask.appendChild(card);
+    mask.addEventListener("click", function (ev) {
+      if (ev.target !== mask) return;
+      closeList();
+      updateModeButtons();
+    });
+    document.body.appendChild(mask);
+    listSheet = mask;
+    listBody = body;
+    setBoardInert(true);
+    document.documentElement.classList.add("tag-modal-open");
   }
 
   function closeBatch() {
     if (batchSheet) batchSheet.remove();
     batchSheet = null;
-    setBoardInert(false);
-    document.documentElement.classList.remove("tag-modal-open");
+    if (!listSheet) {
+      setBoardInert(false);
+      document.documentElement.classList.remove("tag-modal-open");
+    }
   }
 
   function openBatch() {
+    closeList();
     closeBatch();
     const mask = document.createElement("div");
     mask.className = "batch-tag-mask";
@@ -1379,6 +1447,8 @@
         if (Date.now() - lastLoadAt > 15000) load();
         return;
       }
+      closeList();
+      closeBatch();
       person = who;
       mode = "all";
       modeActive = "all";

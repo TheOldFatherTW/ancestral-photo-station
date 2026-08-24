@@ -1362,7 +1362,7 @@ button.mode-pick[hidden] {
   margin-top: 10px;
 }
 .tag-picker-suggest .tag-chip {
-  touch-action: manipulation;
+  touch-action: pan-y;
 }
 .tag-suggest-title {
   width: 100%;

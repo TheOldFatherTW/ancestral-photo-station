@@ -304,7 +304,6 @@
         choose(tag);
       }
       const chip = tagChip(tag, false, pick);
-      chip.addEventListener("pointerdown", pick);
       host.appendChild(chip);
     });
   }
@@ -827,6 +826,11 @@
     });
     document.body.appendChild(mask);
     findSheet = mask;
+    const box = mask.querySelector(".tag-picker-suggest");
+    if (box) {
+      box.scrollTop = 1;
+      box.scrollTop = 0;
+    }
     setBoardInert(true);
     document.documentElement.classList.add("tag-modal-open");
   }

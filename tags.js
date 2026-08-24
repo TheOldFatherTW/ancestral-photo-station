@@ -329,7 +329,8 @@
     const form = document.createElement("form");
     form.className = "tag-picker-form";
     form.autocomplete = "off";
-    const input = tagInput(opts.mainAction ? "找照片？" : "搜尋標籤");
+    const findAsk = opts.mainAction && opts.ids && opts.ids.length ? "加標籤？" : "找標籤？";
+    const input = tagInput(opts.mainAction ? findAsk : "搜尋標籤");
     const go = opts.hideGo ? null : submitArrow(opts.actionText, opts.mainAction ? "mode-pick" : "");
     const suggest = document.createElement("div");
     suggest.className = "tag-picker-suggest";
@@ -442,7 +443,7 @@
         return;
       }
       root.classList.remove("is-searching");
-      if (opts.mainAction) input.placeholder = "找照片？";
+      if (opts.mainAction) input.placeholder = opts.ids && opts.ids.length ? "加標籤？" : "找標籤？";
       refresh();
     }
     input.addEventListener("blur", function () {
@@ -538,7 +539,8 @@
     const face = document.createElement("span");
     face.className = "tag-apply-face";
     const label = document.createElement("span");
-    label.textContent = "立即篩選";
+    label.textContent =
+      selected.length > 1 ? "尋找這些標籤的照片" : "尋找有此標籤的照片";
     face.appendChild(label);
     face.insertAdjacentHTML("beforeend", CHEV);
     btn.appendChild(face);
@@ -573,7 +575,7 @@
     btn.dataset.mode = id;
     btn.className = "mode-btn" + (id === "find" ? " mode-find" : "");
     if (id === "find") {
-      btn.innerHTML = MAG + "<span>找照片？</span>";
+      btn.innerHTML = MAG + "<span>" + (selected.length ? "加標籤？" : "找標籤？") + "</span>";
       if (finding) btn.classList.add("is-on");
     } else {
       btn.textContent = label;
@@ -615,7 +617,7 @@
     bar.className = "mode-bar";
     bar.appendChild(modeBtn("all", "All"));
     bar.appendChild(modeBtn("list", "List"));
-    bar.appendChild(modeBtn("find", "找照片？"));
+    bar.appendChild(modeBtn("find", selected.length ? "加標籤？" : "找標籤？"));
     board.appendChild(bar);
     board.classList.toggle("is-finding", finding);
     board.classList.toggle("is-dirty", isDirty());
@@ -791,7 +793,7 @@
     const head = document.createElement("div");
     head.className = "batch-tag-head";
     const title = document.createElement("p");
-    title.textContent = "找照片？";
+    title.textContent = selected.length ? "加標籤？" : "找標籤？";
     const close = document.createElement("button");
     close.type = "button";
     close.className = "batch-tag-close";
@@ -806,7 +808,7 @@
     head.appendChild(close);
     const picker = createPicker({
       ids: selected,
-      actionText: "立即篩選",
+      actionText: selected.length > 1 ? "尋找這些標籤的照片" : "尋找有此標籤的照片",
       mainAction: true,
       hideGo: true,
       hideChosen: true,

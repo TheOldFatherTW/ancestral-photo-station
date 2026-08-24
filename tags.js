@@ -291,7 +291,7 @@
     let blurTimer = 0;
     if (!opts.hideInput) form.appendChild(input);
     if (go) form.appendChild(go);
-    if (!opts.chosenHost) card.appendChild(chosen);
+    if (!opts.chosenHost && !opts.hideChosen) card.appendChild(chosen);
     card.appendChild(form);
     card.appendChild(suggest);
     root.appendChild(card);
@@ -317,30 +317,33 @@
     }
 
     function refresh() {
-      chosen.innerHTML = "";
-      chosen.hidden = !ids().length;
-      ids().forEach(function (id) {
-        const tag = tagById(id);
-        if (tag) {
-          const pending = !!(opts.appliedIds && opts.appliedIds().indexOf(id) < 0);
-          chosen.appendChild(
-            removableTagChip(
-              tag,
-              function (picked) {
-                toggle(picked, false);
-              },
-              pending
-            )
-          );
-        }
-      });
+      if (!opts.hideChosen) {
+        chosen.innerHTML = "";
+        chosen.hidden = !ids().length;
+        ids().forEach(function (id) {
+          const tag = tagById(id);
+          if (tag) {
+            const pending = !!(opts.appliedIds && opts.appliedIds().indexOf(id) < 0);
+            chosen.appendChild(
+              removableTagChip(
+                tag,
+                function (picked) {
+                  toggle(picked, false);
+                },
+                pending
+              )
+            );
+          }
+        });
+      }
       const exceptIds = {};
       ids().forEach(function (id) {
         exceptIds[id] = true;
       });
       if (
         !opts.hideInput &&
-        (root.classList.contains("is-searching") ||
+        (opts.alwaysSuggest ||
+          root.classList.contains("is-searching") ||
           document.activeElement === input ||
           input.value)
       ) {
@@ -482,16 +485,12 @@
     btn.type = "button";
     btn.className = "tag-apply";
     btn.hidden = !selected.length || !isDirty();
-    const ring = document.createElement("span");
-    ring.className = "ins-ring";
-    ring.setAttribute("aria-hidden", "true");
     const face = document.createElement("span");
     face.className = "tag-apply-face";
     const label = document.createElement("span");
     label.textContent = "立即篩選";
     face.appendChild(label);
     face.insertAdjacentHTML("beforeend", CHEV);
-    btn.appendChild(ring);
     btn.appendChild(face);
     btn.addEventListener("click", function (ev) {
       ev.preventDefault();
@@ -761,24 +760,21 @@
       actionText: "立即篩選",
       mainAction: true,
       hideGo: true,
-      keepOpen: true,
+      hideChosen: true,
+      alwaysSuggest: true,
       appliedIds: function () {
         return applied;
       },
       allowNew: false,
-      onChange: function (ids) {
-        if (!ids.length && applied.length) {
-          closeFind({ repaint: false });
-          backToAll();
-        }
+      onChange: function () {
+        closeFind();
       },
       onSubmit: function (choices) {
         const ids = choices.map(function (tag) {
           return tag.id;
         });
         selected.splice.apply(selected, [0, selected.length].concat(ids));
-        closeFind({ repaint: false });
-        applyHome();
+        closeFind();
       },
     });
     findRefresh = picker.refresh;
@@ -795,15 +791,6 @@
     findSheet = mask;
     setBoardInert(true);
     document.documentElement.classList.add("tag-modal-open");
-    window.setTimeout(function () {
-      const input = mask.querySelector(".tag-search-input");
-      if (!input) return;
-      try {
-        input.focus({ preventScroll: true });
-      } catch (e) {
-        input.focus();
-      }
-    }, 0);
   }
 
   function closeBatch() {

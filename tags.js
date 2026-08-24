@@ -348,7 +348,7 @@
         chip.classList.toggle("is-on", ids().indexOf(chip.dataset.tagId) >= 0);
       });
       const dirty = opts.appliedIds && tagKey(ids()) !== tagKey(opts.appliedIds());
-      go.hidden = !!opts.mainAction && !dirty;
+      go.hidden = !!opts.mainAction && (!dirty || !ids().length);
       if (!opts.mainAction) {
         go.disabled = !ids().length && !String(input.value || "").trim();
       }
@@ -404,6 +404,22 @@
     });
   }
 
+  function backToAll() {
+    if (
+      mode === "all" &&
+      modeActive === "all" &&
+      !selected.length &&
+      !applied.length
+    ) {
+      return;
+    }
+    mode = "all";
+    modeActive = "all";
+    selected.splice(0, selected.length);
+    if (window.FamilyFeed) window.FamilyFeed.filter([]);
+    paint(lastBoard);
+  }
+
   function modeBtn(id, label) {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -412,19 +428,7 @@
     btn.textContent = label;
     btn.addEventListener("click", function () {
       if (id === "all") {
-        if (
-          mode === "all" &&
-          modeActive === "all" &&
-          !selected.length &&
-          !applied.length
-        ) {
-          return;
-        }
-        mode = "all";
-        modeActive = "all";
-        selected.splice(0, selected.length);
-        if (window.FamilyFeed) window.FamilyFeed.filter([]);
-        paint(lastBoard);
+        backToAll();
         return;
       }
       if (mode === id && modeActive === id) return;
@@ -461,13 +465,21 @@
         return applied;
       },
       allowNew: false,
-      onChange: function () {
+      onChange: function (ids) {
+        if (!ids.length && applied.length) {
+          backToAll();
+          return;
+        }
         if (mode === "list") paint(lastBoard);
       },
       onSubmit: function (choices) {
         const ids = choices.map(function (tag) {
           return tag.id;
         });
+        if (!ids.length) {
+          backToAll();
+          return;
+        }
         if (window.FamilyFeed) window.FamilyFeed.filter(ids);
       },
     });

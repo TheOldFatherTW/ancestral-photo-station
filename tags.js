@@ -202,7 +202,10 @@
   function tagChip(tag, on, choose) {
     const chip = document.createElement("button");
     chip.type = "button";
-    chip.className = "tag-chip" + (on ? " is-on" : "");
+    let kind = "";
+    if (on === "picked") kind = " is-picked";
+    else if (on) kind = " is-on";
+    chip.className = "tag-chip" + kind;
     chip.dataset.tagId = tag.id;
     chip.textContent = "#" + tag.label;
     chip.addEventListener("click", function (ev) {
@@ -212,11 +215,11 @@
     return chip;
   }
 
-  function removableTagChip(tag, remove) {
+  function removableTagChip(tag, remove, pending) {
     const wrap = document.createElement("span");
-    wrap.className = "tag-chip-wrap is-on";
+    wrap.className = "tag-chip-wrap" + (pending ? " is-picked" : " is-on");
     wrap.dataset.id = tag.id;
-    wrap.appendChild(tagChip(tag, true, remove));
+    wrap.appendChild(tagChip(tag, pending ? "picked" : true, remove));
     const x = document.createElement("button");
     x.type = "button";
     x.className = "ins-x";
@@ -310,10 +313,15 @@
       ids().forEach(function (id) {
         const tag = tagById(id);
         if (tag) {
+          const pending = !!(opts.appliedIds && opts.appliedIds().indexOf(id) < 0);
           chosen.appendChild(
-            removableTagChip(tag, function (picked) {
-              toggle(picked, false);
-            })
+            removableTagChip(
+              tag,
+              function (picked) {
+                toggle(picked, false);
+              },
+              pending
+            )
           );
         }
       });
@@ -348,8 +356,10 @@
         chip.classList.toggle("is-on", ids().indexOf(chip.dataset.tagId) >= 0);
       });
       const dirty = opts.appliedIds && tagKey(ids()) !== tagKey(opts.appliedIds());
-      go.hidden = !!opts.mainAction && (!dirty || !ids().length);
-      if (!opts.mainAction) {
+      if (opts.mainAction) {
+        go.hidden = false;
+        go.disabled = !ids().length || !dirty;
+      } else {
         go.disabled = !ids().length && !String(input.value || "").trim();
       }
     }
@@ -382,6 +392,7 @@
       })[0];
       if (exact && ids().indexOf(exact.id) < 0) ids().push(exact.id);
       refresh();
+      if (opts.mainAction && go.disabled) return;
       const choices = ids()
         .map(tagById)
         .filter(Boolean);
@@ -480,12 +491,18 @@
           backToAll();
           return;
         }
+        const closeList = mode === "list";
+        if (closeList) {
+          mode = "all";
+          modeActive = "";
+        }
         if (window.FamilyFeed) window.FamilyFeed.filter(ids);
+        if (closeList) paint(lastBoard);
       },
     });
     pickerRefresh = picker.refresh;
     board.appendChild(picker.node);
-    if (mode !== "list") return;
+    if (modeActive !== "list") return;
     (lastBoard.groups || []).forEach(function (group) {
       const available = (group.tags || []).filter(function (tag) {
         return selected.indexOf(tag.id) < 0;

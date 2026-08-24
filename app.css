@@ -1103,19 +1103,26 @@ button.tag-submit {
   padding: 0;
 }
 button.tag-submit:disabled {
-  opacity: 0.32;
+  opacity: 1;
   cursor: default;
+}
+button.tag-submit:disabled svg {
+  overflow: visible;
+}
+button.tag-submit:disabled circle {
+  fill: #fff;
+  stroke: var(--line);
+  stroke-width: 1.5;
+  r: 16.5;
+}
+button.tag-submit:disabled path {
+  stroke: #c4c4c4;
 }
 button.mode-pick {
   margin-left: auto;
-  animation: tag-submit-in 180ms ease-out;
 }
 button.mode-pick[hidden] {
   display: none !important;
-}
-@keyframes tag-submit-in {
-  from { opacity: 0; transform: scale(0.72); }
-  to { opacity: 1; transform: scale(1); }
 }
 .tag-picker-suggest {
   display: flex;
@@ -1188,6 +1195,12 @@ button.mode-pick[hidden] {
   background: linear-gradient(120deg, #fa7e1e 0%, #d62976 48%, #962fbf 100%);
   border-color: transparent;
   color: #fff;
+}
+.tag-board button.tag-chip.is-picked,
+.batch-tag-sheet button.tag-chip.is-picked {
+  background: #fff4f7;
+  border-color: var(--rose-soft);
+  color: var(--rose);
 }
 .pswp-tag-sheet .tag-chip.is-lock {
   cursor: default;

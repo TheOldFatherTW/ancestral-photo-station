@@ -297,13 +297,24 @@
     host.appendChild(title);
     hits.forEach(function (tag) {
       let done = false;
+      let moved = false;
+      let x = 0;
+      let y = 0;
       function pick(ev) {
-        if (ev) ev.preventDefault();
-        if (done) return;
+        if (ev && ev.preventDefault) ev.preventDefault();
+        if (done || moved) return;
         done = true;
         choose(tag);
       }
       const chip = tagChip(tag, false, pick);
+      chip.addEventListener("pointerdown", function (ev) {
+        moved = false;
+        x = ev.clientX;
+        y = ev.clientY;
+      });
+      chip.addEventListener("pointermove", function (ev) {
+        if (Math.abs(ev.clientX - x) > 10 || Math.abs(ev.clientY - y) > 10) moved = true;
+      });
       host.appendChild(chip);
     });
   }

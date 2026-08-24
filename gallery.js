@@ -307,12 +307,22 @@
     return Object.keys(picked).length;
   }
 
+  function toolsOn() {
+    return !trashMode && (selecting || !!document.querySelector(".pswp--open"));
+  }
+
   function tellSelect(hint) {
     if (hint !== undefined) selectHint = hint || "";
     if (pickCount() > 0) selectHint = "";
-    if (trashMode) return;
     if (window.FamilyDoor && window.FamilyDoor.setSelect) {
-      window.FamilyDoor.setSelect(selecting ? pickCount() : 0, trashMode, selectHint);
+      window.FamilyDoor.setSelect(
+        selecting ? pickCount() : 0,
+        trashMode,
+        trashMode ? "" : selectHint
+      );
+    }
+    if (window.FamilyDoor && window.FamilyDoor.setRail) {
+      window.FamilyDoor.setRail(toolsOn());
     }
   }
 
@@ -829,7 +839,11 @@
       if (window.FamilyTags) window.FamilyTags.closePhoto();
       tellSelect();
     });
+    lightbox.on("openingAnimationStart", function () {
+      tellSelect();
+    });
     lightbox.on("afterInit", function () {
+      tellSelect();
       const pswp = lightbox.pswp;
       if (!pswp) return;
       pswp.on("resize", function () {

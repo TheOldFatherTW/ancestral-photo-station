@@ -4,12 +4,15 @@
   const DELETE_ID = "media:delete";
   const ARROW =
     '<svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="18"/><path d="M15.2 11.5L22.5 18l-7.3 6.5"/></svg>';
+  const MAG =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M15.2 15.2L20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
   let person = "";
   let selected = [];
   let applied = [];
   let collapsed = { "地點": true, "類型": true, "自訂": true, "人物": true };
   let mode = "all";
   let modeActive = "all";
+  let finding = false;
   let lastBoard = { groups: [], job: {} };
   let sheet = null;
   let sheetItem = null;
@@ -277,7 +280,7 @@
     const form = document.createElement("form");
     form.className = "tag-picker-form";
     form.autocomplete = "off";
-    const input = tagInput("搜尋標籤");
+    const input = tagInput(opts.mainAction ? "找照片？" : "搜尋標籤");
     const go = submitArrow(opts.actionText, opts.mainAction ? "mode-pick" : "");
     const suggest = document.createElement("div");
     suggest.className = "tag-picker-suggest";
@@ -358,6 +361,10 @@
         chip.classList.toggle("is-on", ids().indexOf(chip.dataset.tagId) >= 0);
       });
       const dirty = opts.appliedIds && tagKey(ids()) !== tagKey(opts.appliedIds());
+      if (opts.mainAction && board) {
+        board.classList.toggle("is-dirty", !!dirty);
+        board.classList.toggle("is-finding", !!finding);
+      }
       if (opts.mainAction) {
         go.hidden = false;
         go.disabled = !ids().length || !dirty;
@@ -413,12 +420,24 @@
   function updateModeButtons() {
     if (!board) return;
     board.querySelectorAll(".mode-btn[data-mode]").forEach(function (btn) {
-      btn.classList.toggle("is-on", btn.dataset.mode === modeActive);
+      const on = btn.dataset.mode === "find" ? finding : btn.dataset.mode === modeActive;
+      btn.classList.toggle("is-on", on);
     });
+  }
+
+  function setFinding(on) {
+    finding = !!on;
+    if (!finding && board) {
+      const input = board.querySelector(".tag-picker-form .tag-search-input");
+      if (input) input.blur();
+    }
+    if (board) board.classList.toggle("is-finding", finding);
+    updateModeButtons();
   }
 
   function backToAll() {
     closeList();
+    setFinding(false);
     if (
       mode === "all" &&
       modeActive === "all" &&
@@ -438,13 +457,43 @@
     const btn = document.createElement("button");
     btn.type = "button";
     btn.dataset.mode = id;
-    btn.className = "mode-btn" + (modeActive === id ? " is-on" : "");
-    btn.textContent = label;
+    btn.className = "mode-btn" + (id === "find" ? " mode-find" : "");
+    if (id === "find") {
+      btn.innerHTML = MAG + "<span>找照片？</span>";
+      if (finding) btn.classList.add("is-on");
+    } else {
+      btn.textContent = label;
+      if (modeActive === id) btn.classList.add("is-on");
+    }
     btn.addEventListener("click", function () {
       if (id === "all") {
         backToAll();
         return;
       }
+      if (id === "find") {
+        closeList();
+        const next = !finding;
+        setFinding(next);
+        if (next) {
+          modeActive = "";
+          updateModeButtons();
+          const input = board && board.querySelector(".tag-picker-form .tag-search-input");
+          if (input) {
+            window.setTimeout(function () {
+              try {
+                input.focus({ preventScroll: true });
+              } catch (e) {
+                input.focus();
+              }
+            }, 0);
+          }
+        } else if (!applied.length) {
+          modeActive = "all";
+          updateModeButtons();
+        }
+        return;
+      }
+      setFinding(false);
       if (listSheet) return;
       openList();
     });
@@ -463,7 +512,9 @@
     bar.className = "mode-bar";
     bar.appendChild(modeBtn("all", "All"));
     bar.appendChild(modeBtn("list", "List"));
+    bar.appendChild(modeBtn("find", "找照片？"));
     board.appendChild(bar);
+    board.classList.toggle("is-finding", finding);
     const chosen = document.createElement("div");
     chosen.className = "tag-picker-chosen tag-main-chosen";
     board.appendChild(chosen);
@@ -491,6 +542,7 @@
           return;
         }
         if (window.FamilyFeed) window.FamilyFeed.filter(ids);
+        setFinding(false);
       },
     });
     pickerRefresh = picker.refresh;
@@ -1452,6 +1504,7 @@
       person = who;
       mode = "all";
       modeActive = "all";
+      finding = false;
       selected = [];
       applied = [];
       load();

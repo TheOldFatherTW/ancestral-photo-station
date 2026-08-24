@@ -88,7 +88,7 @@ body {
 .hall.with-feed {
   min-height: auto;
   justify-content: flex-start;
-  padding: calc(32px + env(safe-area-inset-top, 0px)) 16px calc(8px + env(safe-area-inset-bottom, 0px));
+  padding: calc(16px + env(safe-area-inset-top, 0px)) 16px calc(8px + env(safe-area-inset-bottom, 0px));
 }
 .hall.is-invite {
   min-height: 100vh;
@@ -390,20 +390,36 @@ button.apple-next path {
   color: var(--rose);
   white-space: nowrap;
 }
+.hall.with-feed:not(.is-invite) .rose-two,
+.hall.with-feed:not(.is-invite) h1.brand,
+.hall.with-feed:not(.is-invite) .credit {
+  display: none !important;
+}
+.hall.with-feed:not(.is-invite) .profile {
+  width: min(720px, 100%);
+}
+.hall.with-feed:not(.is-invite) .status {
+  margin: 0 0 8px;
+  min-height: 0;
+}
+.hall.with-feed:not(.is-invite) .status:empty {
+  display: none;
+}
 .local-cabs.solo .grid {
   grid-template-columns: 1fr;
   justify-items: center;
 }
 .local-cabs.solo .cab-hud {
-  width: min(560px, 100%);
-  flex-direction: row;
+  width: min(720px, 100%);
+  flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  gap: 18px;
+  gap: 0;
 }
 .local-cabs.solo .cab-wrap {
-  width: min(168px, 38vw);
+  width: min(148px, 42vw);
   flex: 0 0 auto;
+  margin-inline: auto;
 }
 .credit {
   margin: 10px 0 0;
@@ -421,7 +437,7 @@ button.apple-next path {
 }
 .local-cabs {
   width: min(720px, 100%);
-  margin: 36px auto 0;
+  margin: 8px auto 0;
 }
 .grid {
   display: grid;
@@ -466,6 +482,7 @@ a.cab {
 .cab-wrap {
   position: relative;
   width: 100%;
+  overflow: visible;
 }
 .cab-hud {
   display: flex;
@@ -632,6 +649,11 @@ a.cab {
   inset: 0;
   border-radius: 50%;
   pointer-events: none;
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--rose-soft);
+}
+.cab-cover.is-run .cab-ring {
+  box-shadow: none;
   background: conic-gradient(
     from 210deg,
     #feda75 0deg,
@@ -641,8 +663,6 @@ a.cab {
     #4f5bd5 280deg,
     #feda75 360deg
   );
-}
-.cab-cover.is-run .cab-ring {
   animation: ins-spin 2.8s linear infinite;
 }
 .cab-face {
@@ -703,6 +723,13 @@ a.cab {
   position: absolute;
   inset: 0;
   border-radius: 50%;
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px #c8c8c8;
+}
+.ins-icon.is-live .ins-ring,
+.ins-icon.is-run .ins-ring,
+.photo-rail .ins-icon .ins-ring {
+  box-shadow: none;
   background: conic-gradient(
     from 210deg,
     #feda75 0deg,
@@ -715,6 +742,11 @@ a.cab {
 }
 .ins-icon.is-run .ins-ring {
   animation: ins-spin 2.4s linear infinite;
+}
+.ins-icon.is-run,
+.settings-entry.is-run {
+  pointer-events: none;
+  cursor: default;
 }
 .ins-icon.is-cast .ins-ring {
   animation: none;
@@ -808,6 +840,79 @@ a.cab {
 .cab-progress[hidden] {
   display: none !important;
 }
+.cab-liquid {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  overflow: hidden;
+  z-index: 2;
+  pointer-events: none;
+}
+.cab-liquid[hidden] {
+  display: none !important;
+}
+.cab-wave {
+  position: absolute;
+  width: 200%;
+  height: 200%;
+  left: -50%;
+  top: calc(100% - var(--fill, 0%));
+  border-radius: 42%;
+  transition: top 0.55s ease;
+}
+.cab-wave-back {
+  background: rgba(214, 41, 118, 0.38);
+  animation: cab-wave-spin 11s linear infinite;
+}
+.cab-wave-front {
+  background: rgba(193, 53, 132, 0.52);
+  animation: cab-wave-spin 7s linear infinite reverse;
+}
+.cab-liquid.is-local .cab-wave-back {
+  background: rgba(240, 192, 120, 0.42);
+}
+.cab-liquid.is-local .cab-wave-front {
+  background: rgba(224, 160, 74, 0.56);
+}
+@keyframes cab-wave-spin {
+  to { transform: rotate(360deg); }
+}
+.cab-cover > .thinking-five {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+  height: 18px;
+  margin: 0;
+  gap: 7px;
+  pointer-events: none;
+}
+.cab-cover > .thinking-five span {
+  width: 8px;
+  height: 8px;
+  filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.85));
+}
+.cab-caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  min-height: 1.2em;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+.cab-caption[hidden] {
+  display: none !important;
+}
+.cab-caption .hp-text {
+  white-space: nowrap;
+}
 .cab-progress .thinking-five {
   height: 16px;
   margin: 0;
@@ -864,29 +969,32 @@ a.cab {
 }
 .album-head h2 { margin: 0; }
 .album-settings {
-  position: relative;
-  z-index: 30;
-  flex: 0 0 40px;
+  position: absolute;
+  right: -4px;
+  bottom: -2px;
+  z-index: 8;
+  flex: 0 0 34px;
 }
 .album-settings[hidden],
 .settings-menu[hidden] {
   display: none !important;
 }
 .album-settings .settings-toggle {
-  width: 40px;
-  height: 40px;
-  flex-basis: 40px;
-  filter: drop-shadow(0 2px 7px rgba(0, 0, 0, 0.14));
+  width: 34px;
+  height: 34px;
+  flex-basis: 34px;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.22));
 }
 .album-settings .settings-toggle svg {
-  width: 19px;
-  height: 19px;
+  width: 16px;
+  height: 16px;
 }
 .settings-menu {
   position: absolute;
-  top: 46px;
-  right: 0;
-  width: 178px;
+  top: auto;
+  bottom: 0;
+  right: calc(100% + 8px);
+  width: 220px;
   padding: 6px;
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 16px;
@@ -910,6 +1018,16 @@ button.settings-entry {
 }
 button.settings-entry:active {
   background: #f2f2f7;
+}
+.settings-entry .ins-icon {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  pointer-events: none;
+}
+.settings-entry .ins-icon svg {
+  width: 14px;
+  height: 14px;
 }
 .settings-entry svg {
   width: 19px;
@@ -1006,8 +1124,11 @@ button, .btn {
   width: min(720px, 100%);
   margin: 18px auto 0;
   padding-left: 12px;
-  padding-right: calc(64px + env(safe-area-inset-right, 0px));
+  padding-right: 12px;
   text-align: left;
+}
+html.has-rail .tag-board {
+  padding-right: calc(64px + env(safe-area-inset-right, 0px));
 }
 .mode-bar {
   display: flex;
@@ -1030,11 +1151,34 @@ button, .btn {
   color: var(--ink);
   box-shadow: inset 0 0 0 1.5px var(--line);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+}
+.mode-find svg {
+  width: 14px;
+  height: 14px;
+  display: block;
 }
 .mode-btn.is-on {
   color: #fff;
   box-shadow: none;
   background: linear-gradient(120deg, #fa7e1e 0%, #d62976 48%, #962fbf 100%);
+}
+.tag-board:not(.is-finding) .tag-picker-suggest {
+  display: none;
+}
+.tag-board:not(.is-finding) .tag-picker-form {
+  display: none;
+}
+.tag-board:not(.is-finding).is-dirty .tag-picker-form {
+  display: flex;
+  justify-content: flex-end;
+}
+.tag-board:not(.is-finding).is-dirty .tag-search-input {
+  display: none;
 }
 .tag-picker {
   margin: 0 0 14px;
@@ -1842,10 +1986,10 @@ button.batch-tag-close {
   .credit { white-space: normal; }
   .local-cabs.solo .cab-hud {
     width: 100%;
-    gap: 12px;
+    gap: 0;
   }
   .local-cabs.solo .cab-wrap {
-    width: min(104px, 30vw);
+    width: min(132px, 38vw);
   }
   .hp-track { height: 14px; }
   .hp-label { font-size: 12px; }
@@ -1853,6 +1997,11 @@ button.batch-tag-close {
     width: 36px;
     height: 36px;
     flex-basis: 36px;
+  }
+  .album-settings .settings-toggle {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
   }
   .photo-rail .ins-icon {
     width: 40px;
@@ -1862,7 +2011,7 @@ button.batch-tag-close {
   .mode-btn { font-size: 10px; padding: 7px 12px; }
 }
 @media (min-width: 600px) and (pointer: coarse) {
-  .tag-board {
+  html.has-rail .tag-board {
     padding-right: calc(80px + env(safe-area-inset-right, 0px));
   }
   .photo-rail {
@@ -1882,8 +2031,8 @@ button.batch-tag-close {
   }
 }
 @media (min-width: 768px) {
-  .local-cabs.solo .cab-hud { width: min(600px, 100%); }
-  .local-cabs.solo .cab-wrap { width: 156px; }
+  .local-cabs.solo .cab-hud { width: min(720px, 100%); }
+  .local-cabs.solo .cab-wrap { width: 160px; }
 }
 @media (min-width: 1100px) {
   .local-cabs.solo .cab-wrap { width: 176px; }
@@ -1891,7 +2040,8 @@ button.batch-tag-close {
 }
 @media (prefers-reduced-motion: reduce) {
   .cab-cover.is-run .cab-ring,
-  .ins-icon.is-run .ins-ring {
+  .ins-icon.is-run .ins-ring,
+  .cab-wave {
     animation: none;
   }
   .thinking-five span,

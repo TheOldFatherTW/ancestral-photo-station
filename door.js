@@ -29,6 +29,7 @@
   const BATCH_CAP = 12 * 1024 * 1024;
   let backupAsk = {};
   let heldByPerson = {};
+  let selectLine = "";
   const CAMERA =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="8" width="17" height="11.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 8l1.4-2.4h5.2L16 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="13.6" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>';
   const REFRESH =
@@ -190,8 +191,11 @@
     if (album) album.hidden = false;
     if (!solo && albumTitle) albumTitle.textContent = name || names[person] || person;
     if (window.FamilyTags) window.FamilyTags.show(person);
-    showRail(true);
+    showRail(false);
     showSettings(true, person);
+    const hud = cabs && cabs.querySelector('.cab-hud[data-person="' + person + '"]');
+    const p = latestPeople[person];
+    if (hud && p) fillHud(hud, p);
     if (openPerson === person) return;
     openPerson = person;
     if (window.FamilyFeed) window.FamilyFeed.start(person);
@@ -538,11 +542,38 @@
     const menu = wrap.querySelector(".settings-menu");
     const toggle = wrap.querySelector(".settings-toggle");
     if (menu) menu.hidden = true;
-    if (toggle) toggle.setAttribute("aria-expanded", "false");
+    if (toggle) {
+      toggle.setAttribute("aria-expanded", "false");
+      toggle.classList.remove("is-live");
+    }
+  }
+
+  function jobBadge(svg) {
+    const badge = document.createElement("span");
+    badge.className = "ins-icon job-icon";
+    badge.setAttribute("aria-hidden", "true");
+    const ring = document.createElement("span");
+    ring.className = "ins-ring";
+    const face = document.createElement("span");
+    face.className = "ins-face";
+    face.innerHTML = svg;
+    badge.appendChild(ring);
+    badge.appendChild(face);
+    return badge;
+  }
+
+  function setJobRun(entry, on) {
+    if (!entry) return;
+    entry.classList.toggle("is-run", !!on);
+    entry.disabled = !!on;
+    entry.setAttribute("aria-disabled", on ? "true" : "false");
+    const badge = entry.querySelector(".ins-icon");
+    if (badge) badge.classList.toggle("is-run", !!on);
   }
 
   function ensureSettings() {
-    if (settingsWrap) return settingsWrap;
+    if (settingsWrap && settingsWrap.isConnected) return settingsWrap;
+    settingsWrap = null;
     const wrap = document.createElement("div");
     settingsWrap = wrap;
     wrap.id = "album-settings";
@@ -554,20 +585,37 @@
     menu.className = "settings-menu";
     menu.setAttribute("role", "menu");
     menu.hidden = true;
-    function entry(svg, label, action) {
+    function entry(svg, label, action, job) {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "settings-entry";
       btn.setAttribute("role", "menuitem");
-      btn.innerHTML = svg + "<span>" + label + "</span>";
+      if (job) btn.dataset.job = job;
+      btn.appendChild(jobBadge(svg));
+      const text = document.createElement("span");
+      text.textContent = label;
+      btn.appendChild(text);
       btn.addEventListener("click", function () {
+        if (btn.classList.contains("is-run") || btn.disabled) return;
         closeSettings();
         action();
       });
       return btn;
     }
     menu.appendChild(
-      entry(CAMERA, "換封面", function () {
+      entry(REFRESH, "備份iCloud照片", function () {
+        const pid = wrap.dataset.person || openPerson;
+        if (pid) startBackup(pid);
+      }, "icloud")
+    );
+    menu.appendChild(
+      entry(UPLOAD, "備份本機照片", function () {
+        const pid = wrap.dataset.person || openPerson;
+        if (pid) pickUpload(pid);
+      }, "local")
+    );
+    menu.appendChild(
+      entry(CAMERA, "更換大頭照", function () {
         const pid = wrap.dataset.person || openPerson;
         if (pid) pickCover(pid);
       })
@@ -583,6 +631,7 @@
       const open = menu.hidden;
       menu.hidden = !open;
       toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      toggle.classList.toggle("is-live", open);
     });
     wrap.appendChild(toggle);
     wrap.appendChild(menu);
@@ -600,10 +649,10 @@
     const wrap = ensureSettings();
     pid = pid || openPerson;
     if (on && pid && cabs) {
-      const actions = cabs.querySelector(
-        '.cab-hud[data-person="' + pid + '"] .cab-actions'
+      const host = cabs.querySelector(
+        '.cab-hud[data-person="' + pid + '"] .cab-wrap'
       );
-      if (actions && wrap.parentNode !== actions) actions.appendChild(wrap);
+      if (host && wrap.parentNode !== host) host.appendChild(wrap);
       wrap.dataset.person = pid;
     }
     wrap.hidden = !on;
@@ -649,40 +698,33 @@
     }
     cover.appendChild(ring);
     cover.appendChild(face);
-    const work = document.createElement("div");
-    work.className = "cab-progress";
-    work.hidden = true;
-    work.innerHTML =
-      '<div class="thinking-five" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><div class="cab-progress-bar"></div>';
-    cover.appendChild(work);
+    const liquid = document.createElement("div");
+    liquid.className = "cab-liquid";
+    liquid.hidden = true;
+    liquid.innerHTML =
+      '<span class="cab-wave cab-wave-back"></span><span class="cab-wave cab-wave-front"></span>';
+    cover.appendChild(liquid);
+    const think = document.createElement("div");
+    think.className = "thinking-five";
+    think.setAttribute("aria-hidden", "true");
+    think.hidden = true;
+    think.innerHTML = "<span></span><span></span><span></span><span></span><span></span>";
+    cover.appendChild(think);
     a.appendChild(cover);
     wrap.appendChild(a);
-    const refresh = insButton("cab-refresh", REFRESH, "檢查並備份");
-    refresh.addEventListener("click", function (ev) {
-      ev.preventDefault();
-      ev.stopPropagation();
-      startBackup(p.id, refresh);
-    });
-    const send = insButton("cab-send", UPLOAD, "手動上傳照片");
-    send.addEventListener("click", function (ev) {
-      ev.preventDefault();
-      ev.stopPropagation();
-      pickUpload(p.id, send);
-    });
-    const bars = document.createElement("div");
-    bars.className = "cab-bars";
-    bars.appendChild(hpRow("backup"));
-    bars.appendChild(hpRow("tag"));
-    const actions = document.createElement("div");
-    actions.className = "cab-actions";
-    actions.appendChild(refresh);
-    actions.appendChild(send);
-    const side = document.createElement("div");
-    side.className = "cab-side";
-    side.appendChild(bars);
-    side.appendChild(actions);
+    const cap = document.createElement("div");
+    cap.className = "cab-caption";
+    cap.hidden = true;
+    const capText = document.createElement("span");
+    capText.className = "hp-text";
+    const capAlt = document.createElement("span");
+    capAlt.className = "hp-alt";
+    capAlt.hidden = true;
+    capAlt.innerHTML = '<span class="hp-alt-pct"></span><span class="hp-alt-count"></span>';
+    cap.appendChild(capText);
+    cap.appendChild(capAlt);
     hud.appendChild(wrap);
-    hud.appendChild(side);
+    hud.appendChild(cap);
     fillHud(hud, p);
     return hud;
   }
@@ -735,9 +777,8 @@
     if (p && hud) fillHud(hud, p);
   }
 
-  function paintUpload(person, view, sub) {
+  function paintUpload(person, view) {
     setUploadView(person, view);
-    paintUp(view, sub);
   }
 
   function clearUploadView(person, after) {
@@ -751,6 +792,48 @@
     }, after);
   }
 
+  function fillAmount(running, percent) {
+    if (!running) return null;
+    const n = Number(percent);
+    if (Number.isFinite(n)) return Math.max(0, Math.min(100, n));
+    return 42;
+  }
+
+  function paintBackdrop() {
+    const hall = document.getElementById("hall");
+    if (hall && hall.classList.contains("is-invite")) return;
+    let on = !!uploadBusy;
+    Object.keys(latestPeople).forEach(function (id) {
+      const person = latestPeople[id];
+      if (!person) return;
+      const local = uploadViews[id];
+      if ((local && local.running) || person.sync === "running" || backupAsk[id]) on = true;
+      if (person.tag && person.tag.state === "running") on = true;
+    });
+    const blobs = document.getElementById("blobs");
+    if (blobs) blobs.hidden = !on;
+    document.documentElement.classList.toggle("is-backing", !!on);
+  }
+
+  function paintCap(el, view, idle) {
+    if (!el) return;
+    if (view && (view.running || view.error)) {
+      el.hidden = false;
+      paintHp(el, view);
+      return;
+    }
+    if (idle) {
+      el.hidden = false;
+      const text = el.querySelector(".hp-text");
+      const alt = el.querySelector(".hp-alt");
+      if (text) text.textContent = idle;
+      if (alt) alt.hidden = true;
+      el.classList.remove("is-run", "is-wait", "is-done", "is-error");
+      return;
+    }
+    el.hidden = true;
+  }
+
   function fillHud(hud, p) {
     const id = p.id;
     const local = uploadViews[id] || null;
@@ -761,23 +844,16 @@
         localStorage.setItem("family.backupDone." + id, "1");
       } catch (e) {}
     }
-    let remembered = false;
-    try {
-      remembered = localStorage.getItem("family.backupDone." + id) === "1";
-    } catch (e) {}
-    const showRun = !!(local && local.running) || backupRun || !!backupAsk[id];
+    const localRun = !!(local && local.running) || (uploadBusy && uploadPerson === id);
+    const icloudRun = !localRun && (backupRun || !!backupAsk[id]);
+    const showRun = localRun || icloudRun;
     const shownLocal = local && (local.running || !showRun) ? local : null;
-    const backupDone =
-      !showRun &&
-      (shownLocal
-        ? !!shownLocal.done
-        : remembered || p.sync === "synced" || p.percent === 100);
     let busyText = "備份中...";
     if (!shownLocal && p.backup_phase === "checking") busyText = "核對中...";
     if (!shownLocal && p.backup_phase === "retry") busyText = "重新連線...";
-    paintHp(hud.querySelector('.hp[data-kind="backup"]'), {
+    const backupView = {
       running: showRun,
-      done: backupDone,
+      done: false,
       error: !!(shownLocal && shownLocal.error),
       errorText: shownLocal && shownLocal.errorText,
       percent: shownLocal && shownLocal.percent != null ? shownLocal.percent : p.percent,
@@ -786,30 +862,48 @@
       busyText: busyText,
       doneText: "備份完成",
       waitText: "尚未檢查",
-    });
+    };
     const job = p.tag || {};
     const tagRun = job.state === "running";
-    const hasPhotos = (p.icloud_files || 0) + (p.usb_files || 0) > 0;
-    const tagDone = hasPhotos && !tagRun && job.percent === 100;
-    paintHp(hud.querySelector('.hp[data-kind="tag"]'), {
+    const tagView = {
       running: tagRun,
-      done: tagDone,
-      percent: tagRun ? job.percent : tagDone ? 100 : null,
+      done: false,
+      percent: tagRun ? job.percent : null,
       busyText: "自動標記中…",
       doneText: "標記完成",
       waitText: "尚未標記",
-    });
-    const refresh = hud.querySelector(".cab-refresh");
-    if (refresh) refresh.classList.toggle("is-run", showRun);
-    const cover = hud.querySelector(".cab-cover");
-    if (cover) cover.classList.toggle("is-run", showRun);
-    const work = hud.querySelector(".cab-progress");
-    if (work) {
-      work.hidden = !showRun;
-      if (showRun && window.RoseTwo && window.RoseTwo.mountBar) {
-        window.RoseTwo.mountBar(work.querySelector(".cab-progress-bar"));
-      }
+    };
+    const backupFill = fillAmount(showRun, backupView.percent);
+    const tagFill = fillAmount(tagRun, tagView.percent);
+    let fill = 0;
+    const liquidOn = showRun || tagRun;
+    if (showRun && tagRun) {
+      fill = ((backupFill == null ? 42 : backupFill) + (tagFill == null ? 42 : tagFill)) / 2;
+    } else if (showRun) {
+      fill = backupFill == null ? 42 : backupFill;
+    } else if (tagRun) {
+      fill = tagFill == null ? 42 : tagFill;
     }
+    const cover = hud.querySelector(".cab-cover");
+    if (cover) cover.classList.toggle("is-run", liquidOn);
+    const liquid = hud.querySelector(".cab-liquid");
+    if (liquid) {
+      liquid.hidden = !liquidOn;
+      liquid.style.setProperty("--fill", fill + "%");
+      liquid.classList.toggle("is-local", localRun);
+    }
+    const think = hud.querySelector(".cab-cover > .thinking-five");
+    if (think) think.hidden = !liquidOn;
+    const cap = hud.querySelector(".cab-caption");
+    if (showRun || (shownLocal && shownLocal.error)) paintCap(cap, backupView, "");
+    else if (tagRun) paintCap(cap, tagView, "");
+    else paintCap(cap, null, selectLine);
+    const box = settingsWrap || document.getElementById("album-settings");
+    if (box && box.dataset.person === id) {
+      setJobRun(box.querySelector('[data-job="icloud"]'), icloudRun);
+      setJobRun(box.querySelector('[data-job="local"]'), localRun);
+    }
+    paintBackdrop();
   }
 
   function paintHp(row, view) {
@@ -868,34 +962,28 @@
     });
   }
 
-  function startBackup(person, btn) {
+  function startBackup(person) {
+    const row = latestPeople[person];
+    if (backupAsk[person] || (row && row.sync === "running")) return;
     backupAsk[person] = true;
     try {
       localStorage.removeItem("family.backupDone." + person);
     } catch (e) {}
-    if (btn) btn.classList.add("is-run");
     const hud = cabs && cabs.querySelector('.cab-hud[data-person="' + person + '"]');
-    if (hud) {
+    if (hud && row) fillHud(hud, row);
+    else if (hud) {
       const cover = hud.querySelector(".cab-cover");
       if (cover) cover.classList.add("is-run");
-      const work = hud.querySelector(".cab-progress");
-      if (work) {
-        work.hidden = false;
-        if (window.RoseTwo && window.RoseTwo.mountBar) {
-          window.RoseTwo.mountBar(work.querySelector(".cab-progress-bar"));
-        }
+      const liquid = hud.querySelector(".cab-liquid");
+      if (liquid) {
+        liquid.hidden = false;
+        liquid.style.setProperty("--fill", "42%");
+        liquid.classList.remove("is-local");
       }
-      paintHp(hud.querySelector('.hp[data-kind="backup"]'), {
-        running: true,
-        done: false,
-        percent: null,
-        doneCount: 0,
-        totalCount: 0,
-        busyText: "備份中...",
-        doneText: "備份完成",
-        waitText: "尚未檢查",
-      });
+      const think = hud.querySelector(".cab-cover > .thinking-five");
+      if (think) think.hidden = false;
     }
+    paintBackdrop();
     fetch(api("/api/sync?person=" + encodeURIComponent(person)), { method: "POST" })
       .then(function (res) {
         return res.json().then(function (j) {
@@ -912,10 +1000,10 @@
       .catch(function () {
         backupAsk[person] = false;
         fail("現在同步不了，請聯絡維護的那個傢伙");
-        if (btn) btn.classList.remove("is-run");
         const p = latestPeople[person];
-        const hud = cabs && cabs.querySelector('.cab-hud[data-person="' + person + '"]');
-        if (p && hud) fillHud(hud, p);
+        const next = cabs && cabs.querySelector('.cab-hud[data-person="' + person + '"]');
+        if (p && next) fillHud(next, p);
+        else paintBackdrop();
       });
   }
 
@@ -1014,6 +1102,7 @@
   function showRail(on) {
     const rail = ensureRail();
     if (rail) rail.hidden = !on;
+    document.documentElement.classList.toggle("has-rail", !!on);
   }
 
   function ensureRail() {
@@ -1051,14 +1140,18 @@
     },
     setSelect: function (count, inTrash, hint) {
       const n = Number(count) || 0;
-      if (statusEl) {
-        if (inTrash) statusEl.textContent = "正在看垃圾桶";
-        else if (hint) statusEl.textContent = hint;
-        else if (n > 0) statusEl.textContent = "已選 " + n + " / 99";
-        else if (isRailStatus(statusEl.textContent)) {
-          statusEl.textContent = "";
-        }
-      }
+      if (inTrash) selectLine = "正在看垃圾桶";
+      else if (hint) selectLine = hint;
+      else if (n > 0) selectLine = "已選 " + n + " / 99";
+      else selectLine = "";
+      if (statusEl && isRailStatus(statusEl.textContent)) statusEl.textContent = "";
+      const pid = openPerson;
+      const p = pid && latestPeople[pid];
+      const hud = pid && cabs && cabs.querySelector('.cab-hud[data-person="' + pid + '"]');
+      if (p && hud) fillHud(hud, p);
+    },
+    setRail: function (on) {
+      showRail(!!on);
     },
   };
   window.addEventListener("hashchange", route);

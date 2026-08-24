@@ -1079,6 +1079,7 @@ form.tag-picker-form {
   font-size: 15px;
   -webkit-appearance: none;
   appearance: none;
+  touch-action: pan-y;
 }
 .tag-picker-form .tag-search-input:focus {
   border-color: #d62976;

@@ -140,18 +140,52 @@
     input.spellcheck = false;
     input.setAttribute("enterkeyhint", "done");
     input.className = "tag-search-input";
-    input.addEventListener("pointerdown", function (ev) {
-      const ios =
-        /iPad|iPhone|iPod/.test(navigator.userAgent || "") ||
-        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-      if (!ios || document.activeElement === input) return;
-      ev.preventDefault();
-      try {
-        input.focus({ preventScroll: true });
-      } catch (e) {
-        input.focus();
-      }
-    });
+    // iOS: focus after a tap, not finger-down — scrolling across the field must not open the keyboard.
+    const ios =
+      /iPad|iPhone|iPod/.test(navigator.userAgent || "") ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    if (ios) {
+      let sx = 0;
+      let sy = 0;
+      let moved = false;
+      input.addEventListener(
+        "touchstart",
+        function (ev) {
+          const t = ev.touches[0];
+          if (!t) return;
+          sx = t.clientX;
+          sy = t.clientY;
+          moved = false;
+          if (document.activeElement !== input) input.readOnly = true;
+        },
+        { passive: true }
+      );
+      input.addEventListener(
+        "touchmove",
+        function (ev) {
+          const t = ev.touches[0];
+          if (!t || moved) return;
+          if (Math.abs(t.clientX - sx) > 12 || Math.abs(t.clientY - sy) > 12) {
+            moved = true;
+          }
+        },
+        { passive: true }
+      );
+      input.addEventListener("touchend", function (ev) {
+        input.readOnly = false;
+        if (moved || document.activeElement === input) return;
+        ev.preventDefault();
+        try {
+          input.focus({ preventScroll: true });
+        } catch (e) {
+          input.focus();
+        }
+      });
+      input.addEventListener("touchcancel", function () {
+        moved = true;
+        input.readOnly = false;
+      });
+    }
     return input;
   }
 

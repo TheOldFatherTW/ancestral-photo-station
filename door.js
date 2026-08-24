@@ -191,7 +191,8 @@
     if (album) album.hidden = false;
     if (!solo && albumTitle) albumTitle.textContent = name || names[person] || person;
     if (window.FamilyTags) window.FamilyTags.show(person);
-    showRail(false);
+    if (window.FamilyFeed && window.FamilyFeed.syncTools) window.FamilyFeed.syncTools();
+    else showRail(false);
     showSettings(true, person);
     const hud = cabs && cabs.querySelector('.cab-hud[data-person="' + person + '"]');
     const p = latestPeople[person];

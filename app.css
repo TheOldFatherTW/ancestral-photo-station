@@ -1098,11 +1098,27 @@ button.settings-entry:active {
   object-fit: contain;
   background: #000;
 }
-.vid-wait {
+.pswp-media-wait {
   position: absolute;
-  left: 50%;
-  top: 46%;
-  transform: translate(-50%, -50%);
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  color: var(--rose);
+}
+.pswp-media-wait[hidden] {
+  display: none !important;
+}
+.pswp-media-wait .rose-two {
+  display: block !important;
+  width: 128px;
+  height: 128px;
+  margin: 0 0 18px;
+}
+.pswp-media-wait-msg {
   margin: 0;
   padding: 10px 16px;
   border-radius: 999px;
@@ -1110,8 +1126,6 @@ button.settings-entry:active {
   color: #fff;
   font-size: 15px;
   letter-spacing: 0.04em;
-  pointer-events: none;
-  z-index: 2;
   white-space: nowrap;
 }
 .cab h2, .box h2 { margin: 0 0 8px; font-size: 22px; font-weight: 600; }
@@ -1700,6 +1714,10 @@ button.tag-chip {
   flex-wrap: wrap;
   gap: 8px;
 }
+.pswp-tag-sheet:not(.is-searching) .pswp-tag-suggest,
+.pswp-tag-suggest:empty {
+  display: none !important;
+}
 .pswp-tag-suggest-hint {
   margin: 0 0 2px;
   width: 100%;
@@ -2152,6 +2170,17 @@ button.batch-tag-close {
   .blobs span {
     animation: none;
   }
+}
+.pswp.is-chrome-off .pswp__counter,
+.pswp.is-chrome-off .pswp__button--zoom,
+.pswp.is-chrome-off .pswp__button--arrow,
+.pswp.is-chrome-off .pswp__preloader,
+.pswp.is-chrome-off .pswp-face-cube,
+.pswp.is-chrome-off .pswp-tag-sheet,
+.pswp.is-chrome-off .pswp-tag-card,
+.pswp.is-chrome-off .pswp-face-layer {
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 .pswp,
 .pswp__img,

@@ -26,6 +26,7 @@
   let beforeTrashTags = [];
   let trashMode = false;
   let selecting = false;
+  let viewing = false;
   let picked = {};
   let selectHint = "";
   try {
@@ -308,7 +309,7 @@
   }
 
   function toolsOn() {
-    return !trashMode && (selecting || !!document.querySelector(".pswp--open"));
+    return !trashMode && (selecting || viewing);
   }
 
   function tellSelect(hint) {
@@ -381,8 +382,7 @@
   }
 
   function viewingItem() {
-    if (!lightbox || !lightbox.pswp || !lightbox._slides) return null;
-    if (!document.querySelector(".pswp--open")) return null;
+    if (!viewing || !lightbox || !lightbox.pswp || !lightbox._slides) return null;
     const slide = lightbox._slides[lightbox.pswp.currIndex];
     return (slide && slide.familyItem) || null;
   }
@@ -704,7 +704,7 @@
           tileUrl.replace(/"/g, "") +
           '" src="' +
           src.replace(/"/g, "") +
-          '"></video><p class="vid-wait" hidden>影片準備中…</p></div>',
+          '"></video></div>',
         msrc: tileUrl,
         width: box.w,
         height: box.h,
@@ -724,40 +724,121 @@
     };
   }
 
-  function bufferedPct(video) {
-    const d = video.duration;
-    if (!d || !isFinite(d) || d <= 0) return null;
-    const b = video.buffered;
-    if (!b || !b.length) return 0;
-    const t = video.currentTime || 0;
-    let end = 0;
-    for (let i = 0; i < b.length; i++) {
-      if (b.start(i) <= t + 0.25) end = Math.max(end, b.end(i));
-    }
-    if (!end) end = b.end(b.length - 1);
-    return Math.max(0, Math.min(99, Math.round((end / d) * 100)));
+  let openAnimDone = false;
+  let revealedIndex = -1;
+  let waitGen = 0;
+  let waitTimer = 0;
+  let waitArmedFor = -1;
+
+  function pswpRoot() {
+    return lightbox && lightbox.pswp && lightbox.pswp.element;
   }
 
-  function paintWait(video, on) {
-    const hint = video.parentNode && video.parentNode.querySelector(".vid-wait");
-    if (!hint) return;
-    if (!on) {
-      hint.hidden = true;
+  function hideViewerChrome() {
+    const root = pswpRoot();
+    if (root) root.classList.add("is-chrome-off");
+  }
+
+  function stopMediaWait() {
+    waitGen += 1;
+    waitArmedFor = -1;
+    if (waitTimer) {
+      window.clearTimeout(waitTimer);
+      waitTimer = 0;
+    }
+    const root = pswpRoot();
+    const el = root && root.querySelector(".pswp-media-wait");
+    if (el) el.hidden = true;
+  }
+
+  function ensureMediaWait() {
+    const root = pswpRoot();
+    if (!root) return null;
+    let el = root.querySelector(".pswp-media-wait");
+    if (el) return el;
+    el = document.createElement("div");
+    el.className = "pswp-media-wait";
+    el.hidden = true;
+    const rose = document.createElement("div");
+    rose.className = "rose-two";
+    const msg = document.createElement("p");
+    msg.className = "pswp-media-wait-msg";
+    msg.textContent = "準備中...";
+    el.appendChild(rose);
+    el.appendChild(msg);
+    root.appendChild(el);
+    return el;
+  }
+
+  function armMediaWait() {
+    const pswp = lightbox && lightbox.pswp;
+    const index = pswp ? pswp.currIndex : -1;
+    if (waitArmedFor === index && waitTimer) return;
+    waitArmedFor = index;
+    if (waitTimer) window.clearTimeout(waitTimer);
+    const hold = ensureMediaWait();
+    if (hold) hold.hidden = true;
+    const gen = ++waitGen;
+    waitTimer = window.setTimeout(function () {
+      waitTimer = 0;
+      if (gen !== waitGen || revealedIndex === index) return;
+      const node = ensureMediaWait();
+      if (node) {
+        const rose = node.querySelector(".rose-two");
+        if (window.RoseTwo && window.RoseTwo.mount) window.RoseTwo.mount(rose);
+        node.hidden = false;
+      }
+    }, 1200);
+  }
+
+  function currentMediaReady() {
+    const pswp = lightbox && lightbox.pswp;
+    if (!pswp || !pswp.currSlide) return false;
+    const content = pswp.currSlide.content;
+    if (!content) return false;
+    if (content.isError) return true;
+    const data = content.data || {};
+    if (data.html) {
+      const el = content.element;
+      const video = el && el.querySelector && el.querySelector("video");
+      if (!video) return !!(content.isLoaded && !content.isLoading);
+      return video.readyState >= 2;
+    }
+    const el = content.element;
+    if (el && el.tagName === "IMG") {
+      if (el.classList.contains("pswp__img--placeholder")) return false;
+      return !!(el.complete && el.naturalWidth);
+    }
+    return !!(content.isLoaded && !content.isLoading);
+  }
+
+  function revealViewer() {
+    stopMediaWait();
+    const root = pswpRoot();
+    if (root) root.classList.remove("is-chrome-off");
+    viewing = true;
+    tellSelect();
+  }
+
+  function syncViewerMedia() {
+    const pswp = lightbox && lightbox.pswp;
+    if (!pswp) return;
+    const index = pswp.currIndex;
+    if (index === revealedIndex) return;
+    if (!openAnimDone || !currentMediaReady()) {
+      hideViewerChrome();
+      armMediaWait();
       return;
     }
-    const pct = bufferedPct(video);
-    hint.textContent = pct == null ? "影片準備中…" : "影片準備中 " + pct + "%";
-    hint.hidden = false;
+    revealedIndex = index;
+    revealViewer();
   }
 
   function bindVideoWait(video) {
     if (!video || video.dataset.waitBound) return;
     video.dataset.waitBound = "1";
-    function refresh() {
-      paintWait(video, !video.paused && (video.readyState < 3 || video.seeking));
-    }
-    ["play", "waiting", "seeking", "seeked", "progress", "canplay", "playing", "pause", "ended", "stalled"].forEach(function (name) {
-      video.addEventListener(name, refresh);
+    ["loadeddata", "canplay", "playing", "progress"].forEach(function (name) {
+      video.addEventListener(name, syncViewerMedia);
     });
   }
 
@@ -809,6 +890,7 @@
         else video.addEventListener("loadedmetadata", sizeVid, { once: true });
       }
       if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
+      syncViewerMedia();
     });
     lightbox.on("contentDeactivate", function (evt) {
       const el = evt.content && evt.content.element;
@@ -831,8 +913,20 @@
         applySlideSize(evt.content, el.naturalWidth, el.naturalHeight);
       }
       if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
+      const curr = lightbox.pswp && lightbox.pswp.currSlide;
+      if (curr && evt.content && curr.content === evt.content) syncViewerMedia();
+    });
+    lightbox.on("loadError", function () {
+      openAnimDone = true;
+      const pswp = lightbox.pswp;
+      if (pswp) revealedIndex = pswp.currIndex;
+      revealViewer();
     });
     lightbox.on("close", function () {
+      viewing = false;
+      openAnimDone = false;
+      revealedIndex = -1;
+      stopMediaWait();
       document.querySelectorAll(".pswp-video video").forEach(function (v) {
         v.pause();
       });
@@ -840,12 +934,31 @@
       tellSelect();
     });
     lightbox.on("openingAnimationStart", function () {
+      openAnimDone = false;
+      revealedIndex = -1;
+      viewing = false;
+      hideViewerChrome();
+      armMediaWait();
       tellSelect();
     });
+    lightbox.on("openingAnimationEnd", function () {
+      openAnimDone = true;
+      syncViewerMedia();
+    });
     lightbox.on("afterInit", function () {
+      viewing = false;
+      openAnimDone = false;
+      revealedIndex = -1;
+      hideViewerChrome();
+      armMediaWait();
       tellSelect();
       const pswp = lightbox.pswp;
       if (!pswp) return;
+      window.setTimeout(function () {
+        if (!lightbox.pswp || openAnimDone) return;
+        openAnimDone = true;
+        syncViewerMedia();
+      }, 500);
       pswp.on("resize", function () {
         if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
       });
@@ -869,11 +982,16 @@
       if (lightbox.pswp.currIndex >= lightbox._slides.length - 5 && lightbox._nearEnd) {
         lightbox._nearEnd();
       }
+      if (!openAnimDone || !currentMediaReady()) {
+        hideViewerChrome();
+        armMediaWait();
+      }
       const slide = lightbox._slides[lightbox.pswp.currIndex];
       if (window.FamilyTags && slide && slide.familyItem) {
         if (window.FamilyTags.beforePhotoChange) window.FamilyTags.beforePhotoChange();
         window.FamilyTags.showPhoto(slide.familyItem);
       }
+      syncViewerMedia();
       tellSelect();
     });
     lightbox.init();
@@ -1284,6 +1402,9 @@
     },
     pswp: function () {
       return lightbox && lightbox.pswp;
+    },
+    syncTools: function () {
+      tellSelect();
     },
     stop: function () {
       run += 1;

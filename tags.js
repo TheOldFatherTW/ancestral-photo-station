@@ -142,7 +142,7 @@
     input.type = "search";
     input.name = "search";
     input.maxLength = 48;
-    input.placeholder = placeholder || "搜尋標籤";
+    input.placeholder = placeholder || "新增標籤";
     input.autocomplete = "off";
     input.autocapitalize = "none";
     input.setAttribute("autocorrect", "off");
@@ -998,6 +998,22 @@
     );
   }
 
+  function photoAsk() {
+    if (!sheet) return;
+    const input = sheet.querySelector(".tag-search-input");
+    if (!input) return;
+    const searching = sheet.classList.contains("is-searching");
+    const on = sheet.querySelector(".tag-chip-wrap.is-on");
+    const tag = on && tagById(on.dataset.id);
+    if (searching && tag && tag.kind === "person") {
+      input.placeholder = "輸入人物標籤";
+    } else if (tag && RENAMEABLE[tag.kind]) {
+      input.placeholder = "更改標籤";
+    } else {
+      input.placeholder = "新增標籤";
+    }
+  }
+
   function paintSheet(data, keepFaces) {
     if (data && data.groups) lastBoard.groups = data.groups;
     const node = hostSheet();
@@ -1048,7 +1064,7 @@
     const form = document.createElement("form");
     form.className = "pswp-tag-add tag-picker-form";
     form.autocomplete = "off";
-    const input = tagInput("搜尋標籤");
+    const input = tagInput("新增標籤");
     const go = submitArrow("新增");
     const suggest = document.createElement("div");
     suggest.className = "pswp-tag-suggest tag-picker-suggest";
@@ -1125,6 +1141,10 @@
     }
 
     function renderSuggest() {
+      if (!node.classList.contains("is-searching")) {
+        suggest.innerHTML = "";
+        return;
+      }
       const target = renameTarget();
       renderSuggestions(
         suggest,
@@ -1158,6 +1178,7 @@
       go.title = "新增";
       input.value = "";
       renderSuggest();
+      photoAsk();
     }
 
     function enterRename(tag) {
@@ -1176,8 +1197,9 @@
     function enterSearch() {
       node.classList.add("is-searching");
       const target = renameTarget();
-      title.textContent = target && target.kind === "person" ? "建議的人物" : "建議的標籤";
+      title.textContent = target && target.kind === "person" ? "這是誰?" : "建議的標籤";
       renderSuggest();
+      photoAsk();
     }
 
     function leaveSearch() {
@@ -1185,6 +1207,8 @@
         if (node.contains(document.activeElement)) return;
         node.classList.remove("is-searching");
         title.textContent = sheetItem && sheetItem.kind === "video" ? "這支的標記" : "這張的標記";
+        suggest.innerHTML = "";
+        photoAsk();
       }, 0);
     }
 
@@ -1300,6 +1324,8 @@
     // The tag sheet and the face boxes are fetched side by side, so whichever
     // lands second must not wipe out boxes the other one already drew.
     if (!keepFaces || shipped.length) paintFaces(shipped);
+    if (selectedTag) highlightFace(selectedTag);
+    else photoAsk();
   }
 
   function currentPswp() {
@@ -1496,6 +1522,7 @@
         if (x) x.hidden = !on;
       });
     }
+    photoAsk();
   }
 
   function photoQuery(item) {
@@ -1531,6 +1558,7 @@
   }
 
   function loadPhoto(item) {
+    selectedTag = null;
     sheetItem = item;
     faceTick += 1;
     faceBoxes = [];
@@ -1576,6 +1604,7 @@
   }
 
   function closePhoto() {
+    selectedTag = null;
     sheetItem = null;
     if (faceCtrl) faceCtrl.abort();
     if (sheet) sheet.hidden = true;
@@ -1587,7 +1616,11 @@
   function beforePhotoChange() {
     const active = document.activeElement;
     if (sheet && active && sheet.contains(active) && active.blur) active.blur();
-    if (sheet) sheet.classList.remove("is-searching");
+    if (sheet) {
+      sheet.classList.remove("is-searching");
+      const suggest = sheet.querySelector(".pswp-tag-suggest");
+      if (suggest) suggest.innerHTML = "";
+    }
   }
 
   function refreshPhoto() {

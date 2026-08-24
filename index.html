@@ -25,8 +25,8 @@
 <link rel="icon" href="./rose-two.svg" type="image/svg+xml"/>
 <link rel="apple-touch-icon" href="./icons/rose-two-180.png"/>
 <link rel="stylesheet" href="./vendor/photoswipe/photoswipe.css"/>
-<link rel="stylesheet" href="./app.css?v=70"/>
-<script src="./config.js?v=1787366995"></script>
+<link rel="stylesheet" href="./app.css?v=71"/>
+<script src="./config.js?v=1787610001"></script>
 <script>
 (function () {
   var KEY_RE = /^[A-Za-z0-9_-]{8,128}$/;
@@ -51,7 +51,6 @@
   var token = fromUrl || (KEY_RE.test(stored) ? stored : "") || (KEY_RE.test(cookie) ? cookie : "");
   window.FAMILY_URL_KEY = fromUrl;
   window.FAMILY_VIEW_KEY = token;
-  window.FAMILY_SKIP_BOOT = true;
   if (token) {
     try { localStorage.setItem("family.viewKey", token); } catch (e) {}
     try {
@@ -155,9 +154,9 @@
 <script src="./vendor/photoswipe/photoswipe-lightbox.umd.min.js"></script>
 <script src="./rose-two.js?v=22"></script>
 <script src="./gallery.js?v=50"></script>
-<script src="./tags.js?v=63"></script>
+<script src="./tags.js?v=64"></script>
 <script src="./gate.js?v=12"></script>
-<script src="./door.js?v=58"></script>
+<script src="./door.js?v=59"></script>
 <script>
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js?v=45");

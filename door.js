@@ -830,7 +830,6 @@
     if (isBooting()) return;
     const blobs = document.getElementById("blobs");
     if (blobs) blobs.hidden = true;
-    document.documentElement.classList.remove("is-backing");
   }
 
   function placeSettingsMenu(toggle, menu) {

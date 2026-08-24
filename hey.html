@@ -23,15 +23,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600&display=swap" rel="stylesheet"/>
 <link rel="icon" href="./rose-two.svg" type="image/svg+xml"/>
 <link rel="apple-touch-icon" href="./icons/rose-two-180.png"/>
-<link rel="stylesheet" href="./app.css?v=70"/>
-<script src="./config.js?v=1787366995"></script>
+<link rel="stylesheet" href="./app.css?v=71"/>
+<script src="./config.js?v=1787610001"></script>
 <script>
 (function () {
   var q = new URLSearchParams(location.search).get("k") || "";
   window.FAMILY_FORCE_INVITE = true;
   window.FAMILY_URL_KEY = /^[A-Za-z0-9_-]{8,128}$/.test(q) ? q : "";
   window.FAMILY_VIEW_KEY = "";
-  window.FAMILY_SKIP_BOOT = true;
   var origin = window.VAULT_ORIGIN;
   if (origin) {
     var link = document.createElement("link");

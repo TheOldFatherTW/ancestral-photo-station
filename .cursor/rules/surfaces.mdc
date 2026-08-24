@@ -1,0 +1,32 @@
+---
+description: iPhone、iPad、桌面網頁三套表面：同一套頁，行為分開，不要統一成 click-only。
+globs: "**/*.html,**/*.js,**/*.css"
+alwaysApply: false
+---
+
+# 三套表面（iPhone／iPad／網頁）
+
+同一套 GitHub Pages，三種手的用法。不要為了乾淨把事件模型統一。
+
+## iPhone
+
+- List／找標籤：底部大片白卡，沒有透明黑底。
+- 截圖會在畫面上方合成 click：子視窗必須「手指按在遮罩上再放開」才關。
+- 第一次滑動列表常還不是可捲區：建議標籤不可在 `pointerdown` 就選。
+- 加主畫面只在個人頁；不要掛靜態 manifest。
+
+## iPad
+
+- 同一套白卡改置中、加寬。齒輪菜單對螢幕定位。
+- 鍵盤規則與 iPhone 相同：走 `visualViewport`／`--kb`。
+
+## 桌面網頁
+
+- 滑鼠用 `click` 即可；不要因此把 iOS 的 pointer／touch 門檻拿掉。
+- 非 iOS 才可考慮動態 manifest。
+
+## 不要
+
+- 不要把 gate 與 tags 的鍵盤處理合併成一支函式。
+- 不要用 `interactive-widget=resizes-content` 當 iOS 方案。
+- 不要聽 `visualViewport.scroll` 再 `scrollIntoView`。

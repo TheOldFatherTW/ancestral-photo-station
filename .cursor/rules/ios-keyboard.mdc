@@ -1,0 +1,21 @@
+---
+description: iOS 螢幕小鍵盤不會縮小版面；輸入框必須用 visualViewport 抬起來。
+globs: "**/*.html,**/*.js,**/*.css"
+alwaysApply: true
+---
+
+# iOS 小鍵盤會擋住輸入框
+
+Safari **不會**因為鍵盤縮小排版視窗。`bottom: 0`、垂直置中、`100vh` 裡偏下的欄位，都會被鍵盤蓋住。
+
+## 必做
+
+- 用 `visualViewport` 算被蓋住的高度，寫進 `--kb`，並在 `<html>` 加上 `.kb-up`（見 `tags.js`、`gate.js`）。
+- `--kb` 用 `innerHeight - visualViewport.height`，**不要減 `offsetTop`**。
+- `scrollIntoView` 只在 `focusin` 做一次。不要聽 `visualViewport` 的 `scroll`。
+- 入口 `gate.js` 與標記 `tags.js` 各接一套。不要合併。
+
+## 不要
+
+- 不要只靠 `window.innerHeight` 或假設鍵盤會把頁面頂上去。
+- 不要在 `pointerdown` 就對輸入框 `focus()`。

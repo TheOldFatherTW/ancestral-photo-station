@@ -1729,6 +1729,5 @@
     },
     accept: accept,
     act: post,
-    DELETE_ID: DELETE_ID,
   };
 })();

@@ -391,19 +391,44 @@ button.apple-next path {
   color: var(--rose);
   white-space: nowrap;
 }
-.hall.with-feed:not(.is-invite) .rose-two,
-.hall.with-feed:not(.is-invite) h1.brand,
+.hall.with-feed:not(.is-invite):not(.is-booting) .rose-two,
+.hall.with-feed:not(.is-invite):not(.is-booting) h1.brand,
 .hall.with-feed:not(.is-invite) .credit {
   display: none !important;
 }
-.hall.with-feed:not(.is-invite) .profile {
+.hall.with-feed.is-booting {
+  min-height: 100vh;
+  justify-content: center;
+  padding: 40px 20px 48px;
+}
+.hall.with-feed.is-booting .local-cabs,
+.hall.with-feed.is-booting #album,
+.hall.with-feed.is-booting .tag-board {
+  display: none !important;
+}
+.hall.with-feed.is-booting .rose-two,
+.hall.with-feed.is-booting h1.brand {
+  display: block !important;
+}
+.hall.with-feed.is-booting .profile {
+  width: auto;
+}
+.hall.with-feed.is-booting .status {
+  margin: 22px 0 0;
+  min-height: 1.5em;
+  font-size: clamp(18px, 5.4vw, 22px);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+.hall.with-feed:not(.is-invite):not(.is-booting) .profile {
   width: min(720px, 100%);
 }
-.hall.with-feed:not(.is-invite) .status {
+.hall.with-feed:not(.is-invite):not(.is-booting) .status {
   margin: 0 0 8px;
   min-height: 0;
 }
-.hall.with-feed:not(.is-invite) .status:empty {
+.hall.with-feed:not(.is-invite):not(.is-booting) .status:empty {
   display: none;
 }
 .local-cabs.solo .grid {
@@ -1175,10 +1200,10 @@ button.tag-apply {
   width: 100%;
   height: 44px;
   margin: 0 0 12px;
-  padding: 2.5px;
+  padding: 3px;
   border: 0;
   border-radius: 999px;
-  background: transparent;
+  background: #fff;
   overflow: hidden;
   cursor: pointer;
   color: #fff;
@@ -1189,10 +1214,14 @@ button.tag-apply[hidden] {
 button.tag-apply::before {
   content: "";
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
+  z-index: 0;
+  left: 50%;
+  top: 50%;
+  width: 220%;
+  height: 220%;
+  border-radius: 0;
   background: conic-gradient(
-    from 210deg,
+    from 0deg,
     #feda75 0deg,
     #fa7e1e 70deg,
     #d62976 140deg,
@@ -1200,8 +1229,12 @@ button.tag-apply::before {
     #4f5bd5 280deg,
     #feda75 360deg
   );
-  animation: ins-spin 2.4s linear infinite;
+  animation: tag-apply-spin 2.4s linear infinite;
   pointer-events: none;
+}
+@keyframes tag-apply-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
 }
 .tag-apply-face {
   position: relative;
@@ -1212,6 +1245,7 @@ button.tag-apply::before {
   gap: 6px;
   width: 100%;
   height: 100%;
+  border: 2px solid #fff;
   border-radius: 999px;
   background: #d62976;
   color: #fff;
@@ -1748,6 +1782,8 @@ button.tag-chip {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
   align-items: flex-start;
   align-content: flex-start;
@@ -1760,6 +1796,8 @@ button.tag-chip {
 .tag-modal-open body {
   overflow: hidden;
   height: 100%;
+  touch-action: none;
+  overscroll-behavior: none;
 }
 .kb-up .hall.is-invite {
   justify-content: flex-start;
@@ -1787,6 +1825,8 @@ button.tag-chip {
   justify-content: center;
   padding: 20px 12px calc(12px + env(safe-area-inset-bottom, 0px));
   background: transparent;
+  touch-action: none;
+  overscroll-behavior: none;
 }
 .batch-tag-sheet {
   width: min(520px, 100%);
@@ -1845,12 +1885,16 @@ button.batch-tag-close {
   min-height: min(72dvh, calc(var(--vvh, 100vh) - 12px));
   max-height: min(86dvh, calc(var(--vvh, 100vh) - 12px));
   overflow: hidden;
+  touch-action: none;
+  overscroll-behavior: none;
   padding: 14px 16px calc(16px + env(safe-area-inset-bottom, 0px));
   border-radius: 22px 22px 0 0;
 }
 .list-tag-body {
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
 }
 .list-tag-sheet .batch-tag-head {
@@ -1884,6 +1928,17 @@ button.batch-tag-close {
     min-height: min(66dvh, calc(var(--vvh, 100vh) - 64px));
     max-height: min(82dvh, calc(var(--vvh, 100vh) - 64px));
   }
+}
+.kb-up .list-tag-mask {
+  align-items: stretch;
+  padding: 0;
+}
+.kb-up .list-tag-sheet {
+  width: 100%;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  border-radius: 22px 22px 0 0;
 }
 .tile.is-gone {
   display: none !important;

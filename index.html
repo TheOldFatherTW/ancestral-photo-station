@@ -25,7 +25,7 @@
 <link rel="icon" href="./rose-two.svg" type="image/svg+xml"/>
 <link rel="apple-touch-icon" href="./icons/rose-two-180.png"/>
 <link rel="stylesheet" href="./vendor/photoswipe/photoswipe.css"/>
-<link rel="stylesheet" href="./app.css?v=65"/>
+<link rel="stylesheet" href="./app.css?v=66"/>
 <script src="./config.js?v=1787366995"></script>
 <script>
 (function () {
@@ -82,15 +82,14 @@
 </script>
 </head>
 <body>
-<div class="blobs" id="blobs" hidden aria-hidden="true">
+<div class="blobs" id="blobs" aria-hidden="true">
   <span></span><span></span><span></span><span></span>
 </div>
-<div class="hall with-feed" id="hall">
+<div class="hall with-feed is-booting" id="hall">
   <div class="profile">
     <div class="rose-two" id="rose-two"></div>
     <h1 class="brand">Famiphoto</h1>
-    <p class="credit">since 2026 from 章晨風</p>
-    <p class="status" id="status">正在問備份硬碟…</p>
+    <p class="status" id="status">正在連接備份硬碟…</p>
   </div>
   <div class="invite-panel" id="invite-panel" hidden>
     <p class="invite-hey" id="invite-hey">Hey! 開始備份你的照片</p>
@@ -156,9 +155,9 @@
 <script src="./vendor/photoswipe/photoswipe-lightbox.umd.min.js"></script>
 <script src="./rose-two.js?v=22"></script>
 <script src="./gallery.js?v=48"></script>
-<script src="./tags.js?v=57"></script>
-<script src="./gate.js?v=11"></script>
-<script src="./door.js?v=56"></script>
+<script src="./tags.js?v=58"></script>
+<script src="./gate.js?v=12"></script>
+<script src="./door.js?v=57"></script>
 <script>
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js?v=45");

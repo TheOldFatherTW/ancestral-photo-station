@@ -205,6 +205,19 @@
     if (statusEl) statusEl.textContent = msg || DISCONNECTED;
   }
 
+  function isBooting() {
+    const hall = document.getElementById("hall");
+    return !!(hall && hall.classList.contains("is-booting"));
+  }
+
+  function endBoot() {
+    const hall = document.getElementById("hall");
+    if (!hall || !hall.classList.contains("is-booting")) return;
+    hall.classList.remove("is-booting");
+    if (statusEl && !isRailStatus(statusEl.textContent)) statusEl.textContent = "";
+    paintBackdrop();
+  }
+
   function mb(bytes) {
     const n = bytes / (1024 * 1024);
     return (n < 10 ? n.toFixed(1) : Math.round(n)) + " MB";
@@ -813,6 +826,7 @@
   }
 
   function paintBackdrop() {
+    if (isBooting()) return;
     const blobs = document.getElementById("blobs");
     if (blobs) blobs.hidden = true;
     document.documentElement.classList.remove("is-backing");
@@ -1065,7 +1079,9 @@
     }
     try {
       const pub = await readJson("/api/public");
-      if (statusEl) statusEl.textContent = lineFrom(pub);
+      if (statusEl) {
+        statusEl.textContent = isBooting() ? "正在打開相簿…" : lineFrom(pub);
+      }
       const cab = await readJson("/api/cabinets");
       names = {};
       latestPeople = {};
@@ -1089,6 +1105,7 @@
       window._familyTagging = (cab.people || []).some(function (p) {
         return p.tag && p.tag.state === "running";
       });
+      endBoot();
     } catch (err) {
       if (err && err.code === "need_key") {
         fail(NEED_LINK);

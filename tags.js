@@ -252,6 +252,31 @@
     board.toggleAttribute("inert", !!on);
   }
 
+  function lockSheetPage(mask, close) {
+    let dragged = false;
+    mask.addEventListener("pointerdown", function () {
+      dragged = false;
+    });
+    mask.addEventListener("pointermove", function (ev) {
+      if (ev.pointerType === "mouse" && !ev.buttons) return;
+      dragged = true;
+    });
+    mask.addEventListener(
+      "touchmove",
+      function (ev) {
+        const node = ev.target && ev.target.nodeType === 1 ? ev.target : ev.target && ev.target.parentElement;
+        if (node && node.closest && node.closest(".tag-picker-suggest, .list-tag-body")) return;
+        dragged = true;
+        ev.preventDefault();
+      },
+      { passive: false }
+    );
+    mask.addEventListener("click", function (ev) {
+      if (ev.target !== mask || dragged) return;
+      close();
+    });
+  }
+
   function renderSuggestions(host, query, opts, choose) {
     host.innerHTML = "";
     const hits = catalogOf(query, opts);
@@ -340,13 +365,16 @@
       ids().forEach(function (id) {
         exceptIds[id] = true;
       });
-      if (
-        !opts.hideInput &&
-        (opts.alwaysSuggest ||
-          root.classList.contains("is-searching") ||
-          document.activeElement === input ||
-          input.value)
-      ) {
+      const q = String(input.value || "").trim();
+      const searching =
+        root.classList.contains("is-searching") || document.activeElement === input;
+      let showSuggest = false;
+      if (!opts.hideInput) {
+        if (q) showSuggest = true;
+        else if (opts.alwaysSuggest) showSuggest = !searching;
+        else showSuggest = searching;
+      }
+      if (showSuggest) {
         renderSuggestions(
           suggest,
           input.value,
@@ -383,6 +411,7 @@
     input.addEventListener("focus", function () {
       if (blurTimer) window.clearTimeout(blurTimer);
       root.classList.add("is-searching");
+      if (opts.mainAction) input.placeholder = "輸入標籤文字尋找";
       refresh();
     });
     function finishBlur() {
@@ -393,6 +422,7 @@
         return;
       }
       root.classList.remove("is-searching");
+      if (opts.mainAction) input.placeholder = "找照片？";
       refresh();
     }
     input.addEventListener("blur", function () {
@@ -714,8 +744,7 @@
     card.appendChild(head);
     card.appendChild(body);
     mask.appendChild(card);
-    mask.addEventListener("click", function (ev) {
-      if (ev.target !== mask) return;
+    lockSheetPage(mask, function () {
       closeList();
       updateModeButtons();
     });
@@ -781,8 +810,7 @@
     card.appendChild(head);
     card.appendChild(picker.node);
     mask.appendChild(card);
-    mask.addEventListener("click", function (ev) {
-      if (ev.target !== mask) return;
+    lockSheetPage(mask, function () {
       closeFind();
       if (!applied.length) modeActive = "all";
       updateModeButtons();

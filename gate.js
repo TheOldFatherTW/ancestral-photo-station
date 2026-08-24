@@ -237,7 +237,7 @@
 
   function hideInviteChrome() {
     if (hall) hall.classList.remove("is-invite");
-    if (blobs) blobs.hidden = true;
+    if (blobs && !(hall && hall.classList.contains("is-booting"))) blobs.hidden = true;
     if (panel) panel.hidden = true;
     hideAllInvite();
   }

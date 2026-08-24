@@ -1099,9 +1099,9 @@ button.settings-entry:active {
   background: #000;
 }
 .pswp-media-wait {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: 100;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1112,7 +1112,7 @@ button.settings-entry:active {
 .pswp-media-wait[hidden] {
   display: none !important;
 }
-.pswp-media-wait .rose-two {
+.pswp .pswp-media-wait .rose-two {
   display: block !important;
   width: 128px;
   height: 128px;

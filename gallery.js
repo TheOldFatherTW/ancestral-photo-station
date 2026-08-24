@@ -729,6 +729,7 @@
   let waitGen = 0;
   let waitTimer = 0;
   let waitArmedFor = -1;
+  let waitShownFor = -1;
 
   function pswpRoot() {
     return lightbox && lightbox.pswp && lightbox.pswp.element;
@@ -742,6 +743,7 @@
   function stopMediaWait() {
     waitGen += 1;
     waitArmedFor = -1;
+    waitShownFor = -1;
     if (waitTimer) {
       window.clearTimeout(waitTimer);
       waitTimer = 0;
@@ -773,11 +775,14 @@
   function armMediaWait() {
     const pswp = lightbox && lightbox.pswp;
     const index = pswp ? pswp.currIndex : -1;
+    if (index === revealedIndex || waitShownFor === index) return;
     if (waitArmedFor === index && waitTimer) return;
+    if (waitArmedFor !== index) {
+      const hold = ensureMediaWait();
+      if (hold) hold.hidden = true;
+    }
     waitArmedFor = index;
     if (waitTimer) window.clearTimeout(waitTimer);
-    const hold = ensureMediaWait();
-    if (hold) hold.hidden = true;
     const gen = ++waitGen;
     waitTimer = window.setTimeout(function () {
       waitTimer = 0;
@@ -787,6 +792,7 @@
         const rose = node.querySelector(".rose-two");
         if (window.RoseTwo && window.RoseTwo.mount) window.RoseTwo.mount(rose);
         node.hidden = false;
+        waitShownFor = index;
       }
     }, 1200);
   }
@@ -796,20 +802,18 @@
     if (!pswp || !pswp.currSlide) return false;
     const content = pswp.currSlide.content;
     if (!content) return false;
-    if (content.isError) return true;
+    if (typeof content.isError === "function" && content.isError()) return true;
     const data = content.data || {};
     if (data.html) {
       const el = content.element;
       const video = el && el.querySelector && el.querySelector("video");
-      if (!video) return !!(content.isLoaded && !content.isLoading);
-      return video.readyState >= 2;
+      if (!video) return false;
+      return video.readyState >= 2 && video.videoWidth > 0;
     }
     const el = content.element;
-    if (el && el.tagName === "IMG") {
-      if (el.classList.contains("pswp__img--placeholder")) return false;
-      return !!(el.complete && el.naturalWidth);
-    }
-    return !!(content.isLoaded && !content.isLoading);
+    if (!el || el.tagName !== "IMG") return false;
+    if (el.classList.contains("pswp__img--placeholder")) return false;
+    return !!(el.complete && el.naturalWidth);
   }
 
   function revealViewer() {
@@ -837,7 +841,7 @@
   function bindVideoWait(video) {
     if (!video || video.dataset.waitBound) return;
     video.dataset.waitBound = "1";
-    ["loadeddata", "canplay", "playing", "progress"].forEach(function (name) {
+    ["loadeddata", "canplay", "playing"].forEach(function (name) {
       video.addEventListener(name, syncViewerMedia);
     });
   }

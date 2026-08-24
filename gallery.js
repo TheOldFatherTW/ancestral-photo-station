@@ -4,7 +4,9 @@
   const LIMIT = 24;
   const THUMB_CAP = 6;
   const SELECT_MAX = 99;
-  const THUMB_CACHE = "famiphoto-thumbs-v1";
+  const THUMB_CACHE = "famiphoto-thumbs-v2";
+  const FEED_STORE = "famiphoto.feed.v1.";
+  const FEED_KEEP = 96;
   const SKIP_TRASH_KEY = "family.skipTrashAsk";
   document.addEventListener("contextmenu", function (ev) {
     const t = ev.target && ev.target.closest;
@@ -16,6 +18,7 @@
   let thumbActive = 0;
   const thumbWait = [];
   const blobUrls = [];
+  const feedSnaps = {};
   let paintHint = function () {};
   let afterThumbs = function () {};
   let currentPerson = "";
@@ -25,6 +28,9 @@
   let selecting = false;
   let picked = {};
   let selectHint = "";
+  try {
+    caches.delete("famiphoto-thumbs-v1");
+  } catch (e) {}
 
   function api(path) {
     const url = ORIGIN + path;
@@ -80,19 +86,83 @@
       });
   }
 
-  function writeCachedThumb(url, blob) {
-    if (!blob) return;
+  function writeCachedThumb(key, blob) {
+    if (!blob || !key) return;
     thumbCache()
       .then(function (cache) {
         if (!cache) return;
         return cache.put(
-          url,
+          key,
           new Response(blob, { headers: { "Content-Type": blob.type || "image/jpeg" } })
         );
       })
-      .catch(function () {
-        caches.delete(THUMB_CACHE);
-      });
+      .catch(function () {});
+  }
+
+  function thumbKey(item, size) {
+    const base =
+      typeof location !== "undefined" && location.origin
+        ? location.origin
+        : "https://famiphoto.local";
+    return (
+      base +
+      "/famiphoto-t/" +
+      encodeURIComponent(item.person || "") +
+      "/" +
+      encodeURIComponent(item.bucket || "") +
+      "/" +
+      encodeURIComponent(item.rel || "") +
+      "/" +
+      encodeURIComponent(size || "tile")
+    );
+  }
+
+  function snapId(person, tagIds, trash) {
+    return person + "|" + (trash ? "1" : "0") + "|" + tagKey(tagIds);
+  }
+
+  function readSnap(id) {
+    if (feedSnaps[id] && feedSnaps[id].items && feedSnaps[id].items.length) {
+      return feedSnaps[id];
+    }
+    try {
+      const raw = localStorage.getItem(FEED_STORE + id);
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed && parsed.items && parsed.items.length) {
+        feedSnaps[id] = parsed;
+        return parsed;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function writeSnap(id, total, items) {
+    feedSnaps[id] = { total: total, items: items.slice() };
+    try {
+      localStorage.setItem(
+        FEED_STORE + id,
+        JSON.stringify({ total: total, items: items.slice(0, FEED_KEEP) })
+      );
+    } catch (e) {
+      try {
+        Object.keys(localStorage).forEach(function (k) {
+          if (k.indexOf(FEED_STORE) === 0) localStorage.removeItem(k);
+        });
+        localStorage.setItem(
+          FEED_STORE + id,
+          JSON.stringify({ total: total, items: items.slice(0, FEED_KEEP) })
+        );
+      } catch (e2) {}
+    }
+  }
+
+  function sameHead(a, b, n) {
+    const count = Math.min(n, a.length, b.length);
+    if (!count) return false;
+    for (let i = 0; i < count; i++) {
+      if (itemKey(a[i]) !== itemKey(b[i])) return false;
+    }
+    return true;
   }
 
   function showBlob(img, blob, onReady) {
@@ -114,8 +184,19 @@
     img.src = obj;
   }
 
-  function watchThumb(img, url) {
+  function watchThumb(img, item, size, eager) {
+    const url = qs(item, "thumb", size);
+    const key = thumbKey(item, size);
     img.dataset.thumbUrl = url;
+    img.dataset.thumbKey = key;
+    if (eager) {
+      if (img.dataset.thumbBound) return;
+      img.dataset.thumbBound = "1";
+      bindThumb(img, url, key, function () {
+        img.classList.add("is-on");
+      });
+      return;
+    }
     if (!window.thumbObserver) {
       window.thumbObserver = new IntersectionObserver(
         function (entries) {
@@ -124,9 +205,10 @@
             const node = en.target;
             window.thumbObserver.unobserve(node);
             const src = node.dataset.thumbUrl;
+            const cacheKey = node.dataset.thumbKey;
             if (!src || node.dataset.thumbBound) return;
             node.dataset.thumbBound = "1";
-            bindThumb(node, src, function () {
+            bindThumb(node, src, cacheKey, function () {
               node.classList.add("is-on");
             });
           });
@@ -137,8 +219,8 @@
     window.thumbObserver.observe(img);
   }
 
-  function bindThumb(img, url, onReady) {
-    readCachedThumb(url).then(function (cached) {
+  function bindThumb(img, url, key, onReady) {
+    readCachedThumb(key || url).then(function (cached) {
       if (cached) {
         showBlob(img, cached, onReady);
         return;
@@ -154,7 +236,7 @@
             return res.blob();
           })
           .then(function (blob) {
-            writeCachedThumb(url, blob);
+            writeCachedThumb(key || url, blob);
             showBlob(img, blob, function () {
               settle();
               if (img.isConnected && onReady) onReady();
@@ -796,7 +878,9 @@
       let total = 0;
       let loading = false;
       let lastGroup = "";
+      let headBusy = false;
       const slides = [];
+      const loadedItems = [];
       if (window.thumbObserver) {
         window.thumbObserver.disconnect();
         window.thumbObserver = null;
@@ -831,13 +915,11 @@
         bar.appendChild(back);
         feed.appendChild(bar);
       }
+      const viewId = snapId(person, tagIds, trashMode);
 
       function showHint() {
         if (!hint || my !== run) return;
-        const more = loading || (total > 0 && offset < total);
-        const thumbs = thumbActive > 0 || thumbWait.length > 0;
-        hint.hidden = !(more || thumbs);
-        if (!loading && !offset) hint.hidden = true;
+        hint.hidden = !(loading && !feed.querySelector(".tile"));
       }
       paintHint = showHint;
 
@@ -860,7 +942,7 @@
         img.decoding = "async";
         img.alt = "";
         img.draggable = false;
-        watchThumb(img, qs(item, "thumb", "tile"));
+        watchThumb(img, item, "tile", index < FIRST);
         const shield = document.createElement("span");
         shield.className = "tile-shield";
         a.appendChild(img);
@@ -920,6 +1002,42 @@
         return a;
       }
 
+      function appendItems(items) {
+        (items || []).forEach(function (item) {
+          loadedItems.push(item);
+          if (item.group && item.group !== lastGroup) {
+            lastGroup = item.group;
+            const h = document.createElement("p");
+            h.className = "feed-month";
+            h.textContent = monthLabel(item.group);
+            feed.appendChild(h);
+          }
+          const index = slides.length;
+          const a = tile(item, index);
+          slides.push(slideFor(item, a));
+          feed.appendChild(a);
+        });
+      }
+
+      function clearTiles() {
+        lastGroup = "";
+        loadedItems.length = 0;
+        slides.length = 0;
+        feed.querySelectorAll(".tile, .feed-month, .feed-empty").forEach(function (el) {
+          el.remove();
+        });
+      }
+
+      function paintEmpty() {
+        const empty = document.createElement("p");
+        empty.className = "feed-empty";
+        empty.textContent = trashMode
+          ? "垃圾桶是空的。"
+          : "這個櫃子還沒有照片。";
+        if (!trashMode) feed.innerHTML = "";
+        feed.appendChild(empty);
+      }
+
       function sentinelNear() {
         if (!sentinel || sentinel.hidden) return false;
         const box = sentinel.getBoundingClientRect();
@@ -931,13 +1049,43 @@
         if (sentinelNear()) loadMore();
       };
 
+      async function refreshHead() {
+        if (my !== run) return;
+        headBusy = true;
+        try {
+          const tags = (feed.dataset.tags || "").split(",").filter(Boolean);
+          let path =
+            "/api/photos?person=" +
+            encodeURIComponent(person) +
+            "&offset=0&limit=" +
+            FIRST;
+          if (tags.length) path += "&tags=" + tags.map(encodeURIComponent).join(",");
+          if (trashMode) path += "&trash=1";
+          const res = await fetch(api(path));
+          const data = await res.json();
+          if (my !== run) return;
+          total = data.total;
+          const fresh = data.items || [];
+          if (!sameHead(loadedItems, fresh, FIRST)) {
+            clearTiles();
+            appendItems(fresh);
+            offset = loadedItems.length;
+            if (!offset) paintEmpty();
+          }
+          writeSnap(viewId, total, loadedItems);
+          if (sentinelNear()) loadMore();
+        } catch (err) {
+        } finally {
+          headBusy = false;
+        }
+      }
+
       async function loadMore() {
-        if (loading || my !== run) return;
+        if (loading || headBusy || my !== run) return;
         if (total && offset >= total) return;
         if (offset && thumbsBusy()) return;
         loading = true;
         showHint();
-        let got = 0;
         try {
           const tags = (feed.dataset.tags || "")
             .split(",")
@@ -956,30 +1104,10 @@
           const data = await res.json();
           if (my !== run) return;
           total = data.total;
-          (data.items || []).forEach(function (item) {
-            if (item.group && item.group !== lastGroup) {
-              lastGroup = item.group;
-              const h = document.createElement("p");
-              h.className = "feed-month";
-              h.textContent = monthLabel(item.group);
-              feed.appendChild(h);
-            }
-            const index = slides.length;
-            const a = tile(item, index);
-            slides.push(slideFor(item, a));
-            feed.appendChild(a);
-          });
-          got = (data.items || []).length;
-          offset += got;
-          if (!offset) {
-            const empty = document.createElement("p");
-            empty.className = "feed-empty";
-            empty.textContent = trashMode
-              ? "垃圾桶是空的。"
-              : "這個櫃子還沒有照片。";
-            if (!trashMode) feed.innerHTML = "";
-            feed.appendChild(empty);
-          }
+          appendItems(data.items || []);
+          offset = loadedItems.length;
+          if (!offset) paintEmpty();
+          writeSnap(viewId, total, loadedItems);
         } catch (err) {
           if (my !== run) return;
           if (!offset) {
@@ -990,6 +1118,13 @@
           loading = false;
           showHint();
         }
+      }
+
+      const snap = readSnap(viewId);
+      if (snap && snap.items && snap.items.length) {
+        total = snap.total || snap.items.length;
+        appendItems(snap.items);
+        offset = loadedItems.length;
       }
 
       if (window.feedObserver) window.feedObserver.disconnect();
@@ -1004,7 +1139,8 @@
         window.feedObserver.observe(sentinel);
       }
       showHint();
-      loadMore();
+      if (offset) refreshHead();
+      else loadMore();
     },
     filter: function (tagIds) {
       const person = (document.getElementById("feed") || {}).dataset.person;

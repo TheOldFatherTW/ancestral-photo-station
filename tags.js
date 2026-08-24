@@ -253,28 +253,38 @@
   }
 
   function lockSheetPage(mask, close) {
-    let dragged = false;
-    mask.addEventListener("pointerdown", function () {
-      dragged = false;
+    let press = null;
+    mask.addEventListener("pointerdown", function (ev) {
+      if (ev.target !== mask) {
+        press = null;
+        return;
+      }
+      press = { x: ev.clientX, y: ev.clientY, id: ev.pointerId, at: Date.now() };
     });
     mask.addEventListener("pointermove", function (ev) {
-      if (ev.pointerType === "mouse" && !ev.buttons) return;
-      dragged = true;
+      if (!press || ev.pointerId !== press.id) return;
+      if (Math.abs(ev.clientX - press.x) > 10 || Math.abs(ev.clientY - press.y) > 10) {
+        press = null;
+      }
+    });
+    mask.addEventListener("pointerup", function (ev) {
+      const held = press && Date.now() - press.at >= 40;
+      const ok = held && ev.pointerId === press.id && ev.target === mask;
+      press = null;
+      if (ok) close();
+    });
+    mask.addEventListener("pointercancel", function () {
+      press = null;
     });
     mask.addEventListener(
       "touchmove",
       function (ev) {
         const node = ev.target && ev.target.nodeType === 1 ? ev.target : ev.target && ev.target.parentElement;
         if (node && node.closest && node.closest(".tag-picker-suggest, .list-tag-body")) return;
-        dragged = true;
         ev.preventDefault();
       },
       { passive: false }
     );
-    mask.addEventListener("click", function (ev) {
-      if (ev.target !== mask || dragged) return;
-      close();
-    });
   }
 
   function renderSuggestions(host, query, opts, choose) {

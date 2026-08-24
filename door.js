@@ -632,6 +632,11 @@
       menu.hidden = !open;
       toggle.setAttribute("aria-expanded", open ? "true" : "false");
       toggle.classList.toggle("is-live", open);
+      if (open) {
+        requestAnimationFrame(function () {
+          placeSettingsMenu(toggle, menu);
+        });
+      }
     });
     wrap.appendChild(toggle);
     wrap.appendChild(menu);
@@ -642,6 +647,14 @@
     document.addEventListener("keydown", function (ev) {
       if (ev.key === "Escape") closeSettings();
     });
+    window.addEventListener("resize", function () {
+      placeSettingsMenu(toggle, menu);
+    });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", function () {
+        placeSettingsMenu(toggle, menu);
+      });
+    }
     return wrap;
   }
 
@@ -800,19 +813,33 @@
   }
 
   function paintBackdrop() {
-    const hall = document.getElementById("hall");
-    if (hall && hall.classList.contains("is-invite")) return;
-    let on = !!uploadBusy;
-    Object.keys(latestPeople).forEach(function (id) {
-      const person = latestPeople[id];
-      if (!person) return;
-      const local = uploadViews[id];
-      if ((local && local.running) || person.sync === "running" || backupAsk[id]) on = true;
-      if (person.tag && person.tag.state === "running") on = true;
-    });
     const blobs = document.getElementById("blobs");
-    if (blobs) blobs.hidden = !on;
-    document.documentElement.classList.toggle("is-backing", !!on);
+    if (blobs) blobs.hidden = true;
+    document.documentElement.classList.remove("is-backing");
+  }
+
+  function placeSettingsMenu(toggle, menu) {
+    if (!toggle || !menu || menu.hidden) return;
+    const box = toggle.getBoundingClientRect();
+    const pad = 10;
+    const vv = window.visualViewport;
+    const vw = vv ? vv.width : window.innerWidth;
+    const vh = vv ? vv.height : window.innerHeight;
+    const vo = vv ? vv.offsetTop : 0;
+    const vl = vv ? vv.offsetLeft : 0;
+    const mw = menu.offsetWidth || 220;
+    const mh = menu.offsetHeight || 200;
+    let left = box.right - mw;
+    if (left < vl + pad) left = vl + pad;
+    if (left + mw > vl + vw - pad) left = Math.max(vl + pad, vl + vw - mw - pad);
+    let top = box.bottom + 8;
+    if (top + mh > vo + vh - pad) top = box.top - mh - 8;
+    if (top < vo + pad) top = vo + pad;
+    menu.style.position = "fixed";
+    menu.style.right = "auto";
+    menu.style.bottom = "auto";
+    menu.style.left = Math.round(left) + "px";
+    menu.style.top = Math.round(top) + "px";
   }
 
   function paintCap(el, view, idle) {

@@ -6,6 +6,8 @@
     '<svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="18"/><path d="M15.2 11.5L22.5 18l-7.3 6.5"/></svg>';
   const MAG =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M15.2 15.2L20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  const CHEV =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   let person = "";
   let selected = [];
   let applied = [];
@@ -26,6 +28,8 @@
   let batchSheet = null;
   let listSheet = null;
   let listBody = null;
+  let findSheet = null;
+  let findRefresh = function () {};
   let lastLoadAt = 0;
 
   function api(path, opts) {
@@ -281,12 +285,12 @@
     form.className = "tag-picker-form";
     form.autocomplete = "off";
     const input = tagInput(opts.mainAction ? "找照片？" : "搜尋標籤");
-    const go = submitArrow(opts.actionText, opts.mainAction ? "mode-pick" : "");
+    const go = opts.hideGo ? null : submitArrow(opts.actionText, opts.mainAction ? "mode-pick" : "");
     const suggest = document.createElement("div");
     suggest.className = "tag-picker-suggest";
     let blurTimer = 0;
     if (!opts.hideInput) form.appendChild(input);
-    form.appendChild(go);
+    if (go) form.appendChild(go);
     if (!opts.chosenHost) card.appendChild(chosen);
     card.appendChild(form);
     card.appendChild(suggest);
@@ -345,8 +349,8 @@
           input.value,
           { exceptIds: exceptIds, hideAutoPeople: !input.value },
           function (picked) {
-            toggle(picked, !opts.mainAction);
-            if (!opts.mainAction) return;
+            toggle(picked, opts.keepOpen || !opts.mainAction);
+            if (opts.keepOpen || !opts.mainAction) return;
             if (blurTimer) window.clearTimeout(blurTimer);
             blurTimer = 0;
             root.classList.remove("is-searching");
@@ -365,10 +369,10 @@
         board.classList.toggle("is-dirty", !!dirty);
         board.classList.toggle("is-finding", !!finding);
       }
-      if (opts.mainAction) {
+      if (go && opts.mainAction) {
         go.hidden = false;
         go.disabled = !ids().length || !dirty;
-      } else {
+      } else if (go) {
         go.disabled = !ids().length && !String(input.value || "").trim();
       }
     }
@@ -401,7 +405,7 @@
       })[0];
       if (exact && ids().indexOf(exact.id) < 0) ids().push(exact.id);
       refresh();
-      if (opts.mainAction && go.disabled) return;
+      if (opts.mainAction && go && go.disabled) return;
       const choices = ids()
         .map(tagById)
         .filter(Boolean);
@@ -425,19 +429,80 @@
     });
   }
 
-  function setFinding(on) {
-    finding = !!on;
-    if (!finding && board) {
-      const input = board.querySelector(".tag-picker-form .tag-search-input");
-      if (input) input.blur();
+  function unlockBoard() {
+    if (listSheet || findSheet || batchSheet) return;
+    setBoardInert(false);
+    document.documentElement.classList.remove("tag-modal-open");
+  }
+
+  function isDirty() {
+    return tagKey(selected) !== tagKey(applied);
+  }
+
+  function applyHome() {
+    closeFind({ repaint: false });
+    closeList();
+    if (!selected.length) {
+      backToAll();
+      return;
     }
-    if (board) board.classList.toggle("is-finding", finding);
+    if (window.FamilyFeed) window.FamilyFeed.filter(selected.slice());
+    finding = false;
+    if (board) board.classList.toggle("is-finding", false);
     updateModeButtons();
+    paint(lastBoard);
+  }
+
+  function paintHomeChosen(host) {
+    host.innerHTML = "";
+    host.hidden = !selected.length;
+    selected.forEach(function (id) {
+      const tag = tagById(id);
+      if (!tag) return;
+      host.appendChild(
+        removableTagChip(
+          tag,
+          function (picked) {
+            const at = selected.indexOf(picked.id);
+            if (at >= 0) selected.splice(at, 1);
+            if (!selected.length && applied.length) {
+              backToAll();
+              return;
+            }
+            paint(lastBoard);
+          },
+          applied.indexOf(id) < 0
+        )
+      );
+    });
+  }
+
+  function applyButton() {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "tag-apply";
+    btn.hidden = !selected.length || !isDirty();
+    const ring = document.createElement("span");
+    ring.className = "ins-ring";
+    ring.setAttribute("aria-hidden", "true");
+    const face = document.createElement("span");
+    face.className = "tag-apply-face";
+    const label = document.createElement("span");
+    label.textContent = "立即篩選";
+    face.appendChild(label);
+    face.insertAdjacentHTML("beforeend", CHEV);
+    btn.appendChild(ring);
+    btn.appendChild(face);
+    btn.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      applyHome();
+    });
+    return btn;
   }
 
   function backToAll() {
     closeList();
-    setFinding(false);
+    closeFind({ repaint: false });
     if (
       mode === "all" &&
       modeActive === "all" &&
@@ -472,28 +537,17 @@
       }
       if (id === "find") {
         closeList();
-        const next = !finding;
-        setFinding(next);
-        if (next) {
-          modeActive = "";
+        if (findSheet) {
+          closeFind();
+          if (!applied.length) modeActive = "all";
           updateModeButtons();
-          const input = board && board.querySelector(".tag-picker-form .tag-search-input");
-          if (input) {
-            window.setTimeout(function () {
-              try {
-                input.focus({ preventScroll: true });
-              } catch (e) {
-                input.focus();
-              }
-            }, 0);
-          }
-        } else if (!applied.length) {
-          modeActive = "all";
-          updateModeButtons();
+          return;
         }
+        modeActive = "";
+        openFind();
         return;
       }
-      setFinding(false);
+      closeFind({ repaint: false });
       if (listSheet) return;
       openList();
     });
@@ -515,38 +569,16 @@
     bar.appendChild(modeBtn("find", "找照片？"));
     board.appendChild(bar);
     board.classList.toggle("is-finding", finding);
+    board.classList.toggle("is-dirty", isDirty());
     const chosen = document.createElement("div");
     chosen.className = "tag-picker-chosen tag-main-chosen";
     board.appendChild(chosen);
-    const picker = createPicker({
-      ids: selected,
-      chosenHost: chosen,
-      actionText: "Pick",
-      mainAction: true,
-      appliedIds: function () {
-        return applied;
-      },
-      allowNew: false,
-      onChange: function (ids) {
-        if (!ids.length && applied.length) {
-          backToAll();
-          return;
-        }
-      },
-      onSubmit: function (choices) {
-        const ids = choices.map(function (tag) {
-          return tag.id;
-        });
-        if (!ids.length) {
-          backToAll();
-          return;
-        }
-        if (window.FamilyFeed) window.FamilyFeed.filter(ids);
-        setFinding(false);
-      },
-    });
-    pickerRefresh = picker.refresh;
-    board.appendChild(picker.node);
+    paintHomeChosen(chosen);
+    board.appendChild(applyButton());
+    pickerRefresh = function () {
+      if (findSheet) return;
+      paint(lastBoard);
+    };
   }
 
   function load() {
@@ -561,10 +593,12 @@
         if (
           batchSheet ||
           listSheet ||
+          findSheet ||
           (active && active.classList && active.classList.contains("tag-search-input"))
         ) {
           lastBoard = data || lastBoard;
           if (listSheet && listBody) fillListGroups(listBody);
+          if (findSheet) findRefresh();
           return;
         }
         paint(data);
@@ -574,9 +608,13 @@
 
   function accept(payload) {
     if (payload && payload.groups) {
+      lastBoard = payload;
       if (listSheet && listBody) {
-        lastBoard = payload;
         fillListGroups(listBody);
+        return payload;
+      }
+      if (findSheet) {
+        findRefresh();
         return payload;
       }
       paint(payload);
@@ -593,11 +631,19 @@
     if (listSheet) listSheet.remove();
     listSheet = null;
     listBody = null;
-    if (!batchSheet) {
-      setBoardInert(false);
-      document.documentElement.classList.remove("tag-modal-open");
-    }
+    unlockBoard();
     if (mode === "list") restoreHomeMode();
+  }
+
+  function closeFind(opts) {
+    opts = opts || {};
+    const wasOpen = !!findSheet;
+    if (findSheet) findSheet.remove();
+    findSheet = null;
+    finding = false;
+    if (board) board.classList.toggle("is-finding", false);
+    unlockBoard();
+    if (wasOpen && opts.repaint !== false) paint(lastBoard);
   }
 
   function fillListGroups(host) {
@@ -639,6 +685,7 @@
 
   function openList() {
     closeBatch();
+    closeFind({ repaint: false });
     closeList();
     mode = "list";
     modeActive = "list";
@@ -680,16 +727,93 @@
     document.documentElement.classList.add("tag-modal-open");
   }
 
+  function openFind() {
+    closeBatch();
+    closeList();
+    if (findSheet) findSheet.remove();
+    findSheet = null;
+    finding = true;
+    modeActive = "";
+    if (board) board.classList.toggle("is-finding", true);
+    updateModeButtons();
+    const mask = document.createElement("div");
+    mask.className = "batch-tag-mask list-tag-mask";
+    const card = document.createElement("div");
+    card.className = "batch-tag-sheet list-tag-sheet";
+    const head = document.createElement("div");
+    head.className = "batch-tag-head";
+    const title = document.createElement("p");
+    title.textContent = "找照片？";
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "batch-tag-close";
+    close.setAttribute("aria-label", "關閉");
+    close.textContent = "×";
+    close.addEventListener("click", function () {
+      closeFind();
+      if (!applied.length) modeActive = "all";
+      updateModeButtons();
+    });
+    head.appendChild(title);
+    head.appendChild(close);
+    const picker = createPicker({
+      ids: selected,
+      actionText: "立即篩選",
+      mainAction: true,
+      hideGo: true,
+      keepOpen: true,
+      appliedIds: function () {
+        return applied;
+      },
+      allowNew: false,
+      onChange: function (ids) {
+        if (!ids.length && applied.length) {
+          closeFind({ repaint: false });
+          backToAll();
+        }
+      },
+      onSubmit: function (choices) {
+        const ids = choices.map(function (tag) {
+          return tag.id;
+        });
+        selected.splice.apply(selected, [0, selected.length].concat(ids));
+        closeFind({ repaint: false });
+        applyHome();
+      },
+    });
+    findRefresh = picker.refresh;
+    card.appendChild(head);
+    card.appendChild(picker.node);
+    mask.appendChild(card);
+    mask.addEventListener("click", function (ev) {
+      if (ev.target !== mask) return;
+      closeFind();
+      if (!applied.length) modeActive = "all";
+      updateModeButtons();
+    });
+    document.body.appendChild(mask);
+    findSheet = mask;
+    setBoardInert(true);
+    document.documentElement.classList.add("tag-modal-open");
+    window.setTimeout(function () {
+      const input = mask.querySelector(".tag-search-input");
+      if (!input) return;
+      try {
+        input.focus({ preventScroll: true });
+      } catch (e) {
+        input.focus();
+      }
+    }, 0);
+  }
+
   function closeBatch() {
     if (batchSheet) batchSheet.remove();
     batchSheet = null;
-    if (!listSheet) {
-      setBoardInert(false);
-      document.documentElement.classList.remove("tag-modal-open");
-    }
+    unlockBoard();
   }
 
   function openBatch() {
+    closeFind({ repaint: false });
     closeList();
     closeBatch();
     const mask = document.createElement("div");
@@ -1500,6 +1624,7 @@
         return;
       }
       closeList();
+      closeFind({ repaint: false });
       closeBatch();
       person = who;
       mode = "all";
@@ -1523,7 +1648,8 @@
       applied = (ids || []).slice();
       selected.splice.apply(selected, [0, selected.length].concat(applied));
       if (!(modeActive === "all" && !applied.length)) modeActive = "";
-      pickerRefresh();
+      if (findSheet) findRefresh();
+      else pickerRefresh();
       updateModeButtons();
     },
     accept: accept,

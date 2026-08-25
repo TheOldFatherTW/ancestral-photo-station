@@ -1063,6 +1063,7 @@
       const hint = document.getElementById("feed-hint");
       if (!feed || !person) return;
       tagIds = normalizedTags(tagIds);
+      const pins = (opts && opts.pin) || [];
       const my = ++run;
       let offset = 0;
       let total = 0;
@@ -1106,6 +1107,12 @@
         feed.appendChild(bar);
       }
       const viewId = snapId(person, tagIds, trashMode);
+      if (pins.length) {
+        delete feedSnaps[viewId];
+        try {
+          localStorage.removeItem(FEED_STORE + viewId);
+        } catch (e) {}
+      }
 
       function showHint() {
         if (!hint || my !== run) return;
@@ -1193,8 +1200,24 @@
         return a;
       }
 
+      function mergeFront(items) {
+        const seen = {};
+        const out = [];
+        (pins || []).concat(items || []).forEach(function (item) {
+          if (!item || !item.rel) return;
+          const k = itemKey(item);
+          if (seen[k]) return;
+          seen[k] = true;
+          out.push(item);
+        });
+        return out;
+      }
+
       function appendItems(items) {
         (items || []).forEach(function (item) {
+          if (!item || !item.rel) return;
+          const k = itemKey(item);
+          if (loadedItems.some(function (it) { return itemKey(it) === k; })) return;
           loadedItems.push(item);
           if (item.group && item.group !== lastGroup) {
             lastGroup = item.group;
@@ -1257,11 +1280,12 @@
           if (my !== run) return;
           total = data.total;
           const fresh = data.items || [];
-          if (!sameHead(loadedItems, fresh, FIRST)) {
+          const shown = pins.length ? mergeFront(fresh) : fresh;
+          if (!sameHead(loadedItems, shown, shown.length || FIRST)) {
             clearTiles();
-            appendItems(fresh);
-            offset = loadedItems.length;
-            if (!offset) paintEmpty();
+            appendItems(shown);
+            offset = fresh.length;
+            if (!loadedItems.length) paintEmpty();
           }
           writeSnap(viewId, total, loadedItems);
           if (sentinelNear()) loadMore();
@@ -1295,9 +1319,15 @@
           const data = await res.json();
           if (my !== run) return;
           total = data.total;
-          appendItems(data.items || []);
-          offset = loadedItems.length;
-          if (!offset) paintEmpty();
+          const page = data.items || [];
+          if (!offset && pins.length) appendItems(mergeFront(page));
+          else appendItems(page);
+          offset += page.length;
+          if (!page.length) {
+            total = Math.max(Number(total) || 0, loadedItems.length);
+            offset = Math.max(offset, total);
+          }
+          if (!loadedItems.length) paintEmpty();
           writeSnap(viewId, total, loadedItems);
         } catch (err) {
           if (my !== run) return;
@@ -1312,7 +1342,7 @@
       }
 
       const snap = readSnap(viewId);
-      if (snap && snap.items && snap.items.length) {
+      if (!pins.length && snap && snap.items && snap.items.length) {
         appendItems(snap.items);
         offset = loadedItems.length;
       }

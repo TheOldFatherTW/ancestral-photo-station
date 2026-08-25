@@ -822,6 +822,7 @@
     if (root) root.classList.remove("is-chrome-off");
     viewing = true;
     tellSelect();
+    if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
   }
 
   function syncViewerMedia() {
@@ -948,6 +949,7 @@
     lightbox.on("openingAnimationEnd", function () {
       openAnimDone = true;
       syncViewerMedia();
+      if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
     });
     lightbox.on("afterInit", function () {
       viewing = false;

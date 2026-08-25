@@ -1377,23 +1377,23 @@ button.tag-chip {
 }
 .pswp-face {
   position: absolute;
+  left: 0;
+  top: 0;
+  width: auto;
+  height: auto;
   box-sizing: border-box;
-  border: 2px solid rgba(255, 255, 255, 0.95);
-  box-shadow: 0 0 0 1px rgba(214, 41, 118, 0.85);
-  border-radius: 10px;
+  border: 0;
+  box-shadow: none;
   pointer-events: auto;
   cursor: pointer;
   overflow: visible;
+  white-space: nowrap;
 }
-.pswp-face.is-on {
-  border-color: #d62976;
+.pswp-face.is-on span {
   box-shadow: 0 0 0 2px #fff;
 }
 .pswp-face span {
-  position: absolute;
-  left: 0;
-  bottom: 100%;
-  margin-bottom: 4px;
+  display: inline-block;
   max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1405,8 +1405,6 @@ button.tag-chip {
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  transform: scale(calc(1 / var(--face-z, 1)));
-  transform-origin: left bottom;
 }
 .pswp-tag-sheet .tag-chip.is-on {
   background: linear-gradient(120deg, #fa7e1e 0%, #d62976 48%, #962fbf 100%);
@@ -1447,8 +1445,6 @@ button.tag-chip {
 .pswp-face > .ins-x {
   top: -8px;
   right: -8px;
-  transform: scale(calc(1 / var(--face-z, 1)));
-  transform-origin: right top;
 }
 .pswp-tag-sheet {
   position: absolute;

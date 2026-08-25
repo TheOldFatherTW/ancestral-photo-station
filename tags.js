@@ -21,6 +21,8 @@
   let faceLayer = null;
   let faceBoxes = [];
   let faceTick = 0;
+  let faceLayTries = 0;
+  let faceLayFrame = 0;
   let faceCtrl = null;
   let faceCube = null;
   let selectedTag = null;
@@ -1330,14 +1332,20 @@
       : null;
   }
 
+  function isFacePhoto(el) {
+    return !!(
+      el &&
+      el.tagName === "IMG" &&
+      el.parentNode &&
+      !el.classList.contains("pswp__img--placeholder")
+    );
+  }
+
   function currentPhotoImg() {
     const pswp = currentPswp();
     const slide = pswp && pswp.currSlide;
-    if (slide && slide.content) {
-      const el = slide.content.element;
-      if (el && el.tagName === "IMG" && el.parentNode) return el;
-      const ph = slide.getPlaceholderElement && slide.getPlaceholderElement();
-      if (ph && ph.parentNode) return ph;
+    if (slide && slide.content && isFacePhoto(slide.content.element)) {
+      return slide.content.element;
     }
     const items = document.querySelectorAll(".pswp__item");
     let item = null;
@@ -1349,9 +1357,25 @@
     const imgs = item.querySelectorAll("img.pswp__img");
     let img = null;
     imgs.forEach(function (el) {
-      if (!el.classList.contains("pswp__img--placeholder")) img = el;
+      if (isFacePhoto(el)) img = el;
     });
-    return img || (imgs.length ? imgs[imgs.length - 1] : null);
+    return img;
+  }
+
+  function cancelFaceLayout() {
+    if (faceLayFrame) {
+      window.cancelAnimationFrame(faceLayFrame);
+      faceLayFrame = 0;
+    }
+    faceLayTries = 0;
+  }
+
+  function askFaceLayout() {
+    if (faceLayFrame) return;
+    faceLayFrame = window.requestAnimationFrame(function () {
+      faceLayFrame = 0;
+      layoutFaces();
+    });
   }
 
   function ensureFaceLayer() {
@@ -1366,6 +1390,7 @@
 
   function clearFaces() {
     faceTick += 1;
+    cancelFaceLayout();
     faceBoxes = [];
     document.querySelectorAll(".pswp-face-layer").forEach(function (el) {
       el.remove();
@@ -1381,9 +1406,9 @@
   }
 
   function syncFaceZoom() {
-    if (!faceLayer || !faceLayer.isConnected || !faceBoxes.length) return;
+    if (!faceLayer || !faceLayer.isConnected || !faceBoxes.length) return false;
     const img = currentPhotoImg();
-    if (!img || !img.parentNode) return;
+    if (!img || !img.parentNode) return false;
     const pswp = currentPswp();
     const content = pswp && pswp.currSlide && pswp.currSlide.content;
     let w = img.offsetWidth;
@@ -1392,7 +1417,7 @@
       w = content.displayedImageWidth;
       h = content.displayedImageHeight;
     }
-    if (w < 8 || h < 8) return;
+    if (w < 8 || h < 8) return false;
     const widthPx = w + "px";
     const heightPx = h + "px";
     if (faceLayer.style.width !== widthPx) faceLayer.style.width = widthPx;
@@ -1401,7 +1426,49 @@
     const topPx = img.offsetTop + "px";
     if (faceLayer.style.left !== leftPx) faceLayer.style.left = leftPx;
     if (faceLayer.style.top !== topPx) faceLayer.style.top = topPx;
-    faceLayer.style.setProperty("--face-z", String(wrapScale(pswp && pswp.currSlide)));
+    const z = wrapScale(pswp && pswp.currSlide);
+    faceLayer.style.setProperty("--face-z", String(z));
+    placeFaceNames(z);
+    return true;
+  }
+
+  function placeFaceNames(z) {
+    if (!faceLayer) return;
+    const lw = faceLayer.offsetWidth;
+    const lh = faceLayer.offsetHeight;
+    if (lw < 8 || lh < 8) return;
+    z = z > 0 ? z : 1;
+    const pad = 4;
+    const nodes = faceLayer.querySelectorAll(".pswp-face");
+    nodes.forEach(function (box, i) {
+      const face = faceBoxes[i];
+      if (!face || !face.bbox) return;
+      const cap = box.querySelector("span");
+      if (cap) {
+        cap.style.maxWidth = Math.min(160, Math.max(32, lw - pad * 2)) + "px";
+      }
+      const nw = box.offsetWidth;
+      const nh = box.offsetHeight;
+      const vw = nw / z;
+      const vh = nh / z;
+      const x1 = face.bbox[0];
+      const y1 = face.bbox[1];
+      const x2 = face.bbox[2];
+      const y2 = face.bbox[3];
+      const cx = ((x1 + x2) / 2) * lw;
+      const faceTop = y1 * lh;
+      const faceBot = y2 * lh;
+      let left = cx - vw / 2;
+      let top = faceTop - vh - pad;
+      if (top < pad) top = faceBot + pad;
+      if (top + vh > lh - pad) top = Math.max(pad, lh - pad - vh);
+      if (left < pad) left = pad;
+      if (left + vw > lw - pad) left = Math.max(pad, lw - pad - vw);
+      box.style.left = Math.round(left) + "px";
+      box.style.top = Math.round(top) + "px";
+      box.style.transform = "scale(" + 1 / z + ")";
+      box.style.transformOrigin = "0 0";
+    });
   }
 
   function fillFaceBoxes() {
@@ -1411,14 +1478,6 @@
       const box = document.createElement("div");
       box.className = "pswp-face";
       box.dataset.id = face.id;
-      const x1 = face.bbox[0];
-      const y1 = face.bbox[1];
-      const x2 = face.bbox[2];
-      const y2 = face.bbox[3];
-      box.style.left = x1 * 100 + "%";
-      box.style.top = y1 * 100 + "%";
-      box.style.width = Math.max(0, x2 - x1) * 100 + "%";
-      box.style.height = Math.max(0, y2 - y1) * 100 + "%";
       const cap = document.createElement("span");
       cap.textContent = face.label || "";
       const x = document.createElement("button");
@@ -1477,16 +1536,28 @@
           { once: true }
         );
       }
+      if (faceLayTries < 24) {
+        faceLayTries += 1;
+        askFaceLayout();
+      }
       return;
     }
     wrap.appendChild(layer);
     if (!layer.querySelector(".pswp-face")) fillFaceBoxes();
     applyFaceCube();
-    syncFaceZoom();
+    if (syncFaceZoom()) {
+      faceLayTries = 0;
+      return;
+    }
+    if (faceLayTries < 24) {
+      faceLayTries += 1;
+      askFaceLayout();
+    }
   }
 
   function paintFaces(faces) {
     faceTick += 1;
+    faceLayTries = 0;
     faceBoxes = (faces || []).filter(function (face) {
       return face && face.bbox && face.bbox.length === 4;
     });
@@ -1557,6 +1628,7 @@
     selectedTag = null;
     sheetItem = item;
     faceTick += 1;
+    cancelFaceLayout();
     faceBoxes = [];
     if (faceLayer) faceLayer.innerHTML = "";
     const node = hostSheet();

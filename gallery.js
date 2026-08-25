@@ -1338,6 +1338,14 @@
         } finally {
           loading = false;
           showHint();
+          if (
+            my === run &&
+            offset &&
+            !(total && offset >= total) &&
+            sentinelNear()
+          ) {
+            loadMore();
+          }
         }
       }
 

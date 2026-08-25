@@ -735,6 +735,31 @@
     return lightbox && lightbox.pswp && lightbox.pswp.element;
   }
 
+  let uiOff = false;
+
+  function applyViewerUi() {
+    const root = pswpRoot();
+    if (root) root.classList.toggle("is-ui-off", uiOff);
+    document.documentElement.classList.toggle("is-ui-off", uiOff);
+  }
+
+  function resetViewerUi() {
+    uiOff = false;
+    applyViewerUi();
+  }
+
+  // PhotoSwipe already drops drag, pinch, and double-tap zoom before this runs.
+  function onViewerTap(_point, originalEvent) {
+    if (!viewing) return;
+    if (document.documentElement.classList.contains("kb-up")) return;
+    const target = originalEvent && originalEvent.target;
+    if (target && target.closest && target.closest(".pswp-face, button, input, textarea, a, video")) {
+      return;
+    }
+    uiOff = !uiOff;
+    applyViewerUi();
+  }
+
   function hideViewerChrome() {
     const root = pswpRoot();
     if (root) root.classList.add("is-chrome-off");
@@ -821,6 +846,7 @@
     const root = pswpRoot();
     if (root) root.classList.remove("is-chrome-off");
     viewing = true;
+    applyViewerUi();
     tellSelect();
     if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
   }
@@ -862,8 +888,8 @@
       bgOpacity: 0.92,
       errorMsg: "目前無法載入",
       clickToCloseNonZoomable: false,
-      imageClickAction: false,
-      tapAction: false,
+      imageClickAction: onViewerTap,
+      tapAction: onViewerTap,
       maxZoomLevel: 12,
     });
     lightbox.addFilter("isContentZoomable", function (zoomable, content) {
@@ -931,6 +957,7 @@
       viewing = false;
       openAnimDone = false;
       revealedIndex = -1;
+      resetViewerUi();
       stopMediaWait();
       document.querySelectorAll(".pswp-video video").forEach(function (v) {
         v.pause();
@@ -942,6 +969,7 @@
       openAnimDone = false;
       revealedIndex = -1;
       viewing = false;
+      resetViewerUi();
       hideViewerChrome();
       armMediaWait();
       tellSelect();

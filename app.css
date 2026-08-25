@@ -1999,6 +1999,15 @@ button.batch-tag-close {
   opacity: 0 !important;
   pointer-events: none !important;
 }
+.pswp.is-ui-off .pswp-tag-sheet,
+.pswp.is-ui-off .pswp-tag-card,
+html.is-ui-off .photo-rail {
+  opacity: 0;
+  pointer-events: none;
+}
+html.is-ui-off .photo-rail .ins-icon {
+  pointer-events: none;
+}
 .pswp,
 .pswp__img,
 .pswp__item,

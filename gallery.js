@@ -8,11 +8,6 @@
   const FEED_STORE = "famiphoto.feed.v1.";
   const FEED_KEEP = 96;
   const SKIP_TRASH_KEY = "family.skipTrashAsk";
-  document.addEventListener("contextmenu", function (ev) {
-    const t = ev.target && ev.target.closest;
-    if (!t) return;
-    if (ev.target.closest(".tile") || ev.target.closest(".pswp")) ev.preventDefault();
-  }, true);
   let run = 0;
   let lightbox;
   let thumbActive = 0;

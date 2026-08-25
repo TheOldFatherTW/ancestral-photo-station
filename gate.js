@@ -1,4 +1,27 @@
 (function () {
+  function typingField(target) {
+    const el = target && target.nodeType === 3 ? target.parentElement : target;
+    if (!el) return false;
+    if (el.closest && el.closest("input, textarea, [contenteditable='true'], [contenteditable='']")) {
+      return true;
+    }
+    const ae = document.activeElement;
+    return !!(ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.isContentEditable));
+  }
+  function blockAppChrome(ev) {
+    if (typingField(ev.target)) return;
+    ev.preventDefault();
+  }
+  document.addEventListener("contextmenu", blockAppChrome, true);
+  document.addEventListener("selectstart", blockAppChrome, true);
+  document.addEventListener("dragstart", blockAppChrome, true);
+  document.addEventListener("selectionchange", function () {
+    if (typingField(document.activeElement)) return;
+    const sel = window.getSelection && window.getSelection();
+    if (!sel || sel.isCollapsed) return;
+    if (typingField(sel.anchorNode)) return;
+    sel.removeAllRanges();
+  });
   const ORIGIN = (window.VAULT_ORIGIN || "").replace(/\/$/, "");
   const KEY_RE = /^[A-Za-z0-9_-]{8,128}$/;
   const DISCONNECTED = "目前無法連上,請聯絡維護的那個傢伙";

@@ -700,10 +700,10 @@
     hud.dataset.person = p.id;
     const wrap = document.createElement("div");
     wrap.className = "cab-wrap";
-    const a = document.createElement("a");
+    const a = document.createElement("div");
     a.className = "cab" + (p.has_cover ? " has-cover" : "");
-    a.href = "#" + p.id;
     a.dataset.name = p.display_name;
+    a.setAttribute("role", "button");
     a.setAttribute("aria-label", p.display_name);
     const cover = document.createElement("div");
     cover.className = "cab-cover";
@@ -715,6 +715,7 @@
       const img = document.createElement("img");
       img.alt = p.display_name;
       img.decoding = "async";
+      img.draggable = false;
       img.src = api("/cover?person=" + encodeURIComponent(p.id) + "&v=" + (p.cover_rev || 0));
       face.appendChild(img);
     } else {
@@ -723,6 +724,9 @@
       empty.textContent = p.display_name;
       face.appendChild(empty);
     }
+    const shield = document.createElement("span");
+    shield.className = "cab-shield";
+    face.appendChild(shield);
     cover.appendChild(ring);
     cover.appendChild(face);
     const liquid = document.createElement("div");
@@ -738,6 +742,9 @@
     think.innerHTML = "<span></span><span></span><span></span><span></span><span></span>";
     cover.appendChild(think);
     a.appendChild(cover);
+    a.addEventListener("click", function () {
+      location.hash = p.id;
+    });
     wrap.appendChild(a);
     const cap = document.createElement("div");
     cap.className = "cab-caption";
@@ -1128,8 +1135,7 @@
       showHome();
       return;
     }
-    const link = cabs ? cabs.querySelector('a[href="#' + id + '"]') : null;
-    showAlbum(id, (link && link.dataset.name) || names[id] || id);
+    showAlbum(id, names[id] || id);
   }
 
   function isRailStatus(text) {
@@ -1199,6 +1205,13 @@
     },
   };
   window.addEventListener("hashchange", route);
+  const back = document.querySelector("#album .back");
+  if (back) {
+    back.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      location.hash = "";
+    });
+  }
   let polling = false;
   function startPoll() {
     if (polling) return;

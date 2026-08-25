@@ -33,6 +33,7 @@
   let findSheet = null;
   let findRefresh = function () {};
   let lastLoadAt = 0;
+  let feedNeedsSync = false;
 
   function api(path, opts) {
     const origin = (window.VAULT_ORIGIN || "").replace(/\/$/, "");
@@ -247,6 +248,39 @@
 
   function tagKey(ids) {
     return (ids || []).slice().sort().join(",");
+  }
+
+  function rewriteIds(ids, src, dst) {
+    src = String(src || "");
+    dst = String(dst || "");
+    if (!src || !dst || src === dst) return;
+    const seen = {};
+    const out = [];
+    (ids || []).forEach(function (id) {
+      const next = id === src ? dst : id;
+      if (!next || seen[next]) return;
+      seen[next] = true;
+      out.push(next);
+    });
+    ids.splice.apply(ids, [0, ids.length].concat(out));
+  }
+
+  function followMerge(src, dst) {
+    const before = tagKey(applied);
+    rewriteIds(selected, src, dst);
+    rewriteIds(applied, src, dst);
+    if (tagKey(applied) !== before) feedNeedsSync = true;
+  }
+
+  function syncFeedIfNeeded() {
+    if (!feedNeedsSync || sheetItem) return;
+    feedNeedsSync = false;
+    if (!applied.length) {
+      mode = "all";
+      modeActive = "all";
+      selected.splice(0, selected.length);
+    }
+    if (window.FamilyFeed) window.FamilyFeed.filter(applied.slice());
   }
 
   function setBoardInert(on) {
@@ -613,6 +647,13 @@
     selected = selected.filter(function (id) {
       return !!tagById(id);
     });
+    const keptApplied = applied.filter(function (id) {
+      return !!tagById(id);
+    });
+    if (tagKey(keptApplied) !== tagKey(applied)) {
+      applied = keptApplied;
+      feedNeedsSync = true;
+    }
     board.hidden = false;
     board.innerHTML = "";
     const bar = document.createElement("div");
@@ -976,12 +1017,14 @@
     return node;
   }
 
-  function afterChange(payload, item) {
+  function afterChange(payload, item, body) {
+    if (body && body.action === "merge") followMerge(body.id, body.into);
     if (item && stillOn(item)) paintSheet(payload);
     // The write already answers with the whole board, so fetching it again
     // only doubled the wait after every tap.
     if (payload && payload.groups) paint(payload);
     else load();
+    if (!sheetItem) syncFeedIfNeeded();
   }
 
   function runChange(body, working, said) {
@@ -990,7 +1033,7 @@
     return photoPost(body, item).then(
       function (payload) {
         window.FamilyBusy.done(said);
-        afterChange(payload, item);
+        afterChange(payload, item, body);
         return payload;
       },
       function () {
@@ -1679,6 +1722,7 @@
     if (faceCube) faceCube.hidden = true;
     setBoardInert(false);
     clearFaces();
+    window.setTimeout(syncFeedIfNeeded, 0);
   }
 
   function beforePhotoChange() {

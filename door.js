@@ -23,6 +23,7 @@
   let latestPeople = {};
   let uploadViews = {};
   let settingsWrap = null;
+  let settingsCatch = null;
   const UPLOAD_CAP = 480 * 1024 * 1024;
   // Small enough that a phone finishes one before anything between it and the vault
   // gives up, and that the bar moves often, since Safari reports no progress of its own.
@@ -432,13 +433,49 @@
   function closeSettings() {
     const wrap = settingsWrap || document.getElementById("album-settings");
     if (!wrap) return;
-    const menu = wrap.querySelector(".settings-menu");
+    const menu = wrap.querySelector(".settings-menu") || document.querySelector(".settings-menu");
     const toggle = wrap.querySelector(".settings-toggle");
-    if (menu) menu.hidden = true;
+    if (menu) {
+      menu.hidden = true;
+      if (menu.parentNode !== wrap) wrap.appendChild(menu);
+    }
     if (toggle) {
       toggle.setAttribute("aria-expanded", "false");
       toggle.classList.remove("is-live");
     }
+    if (settingsCatch) settingsCatch.hidden = true;
+    document.documentElement.classList.remove("settings-open");
+  }
+
+  function ensureSettingsCatch() {
+    if (settingsCatch && settingsCatch.isConnected) return settingsCatch;
+    const catcher = document.createElement("div");
+    catcher.className = "settings-catch";
+    catcher.hidden = true;
+    catcher.addEventListener("pointerdown", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+    });
+    catcher.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      closeSettings();
+    });
+    document.body.appendChild(catcher);
+    settingsCatch = catcher;
+    return catcher;
+  }
+
+  function openSettingsMenu(toggle, menu) {
+    const catcher = ensureSettingsCatch();
+    catcher.hidden = false;
+    document.body.appendChild(catcher);
+    document.body.appendChild(menu);
+    menu.hidden = false;
+    document.documentElement.classList.add("settings-open");
+    requestAnimationFrame(function () {
+      placeSettingsMenu(toggle, menu);
+    });
   }
 
   function jobBadge(svg) {
@@ -478,6 +515,9 @@
     menu.className = "settings-menu";
     menu.setAttribute("role", "menu");
     menu.hidden = true;
+    menu.addEventListener("pointerdown", function (ev) {
+      ev.stopPropagation();
+    });
     function entry(svg, label, action, job) {
       const btn = document.createElement("button");
       btn.type = "button";
@@ -522,21 +562,14 @@
       ev.preventDefault();
       ev.stopPropagation();
       const open = menu.hidden;
-      menu.hidden = !open;
+      if (open) openSettingsMenu(toggle, menu);
+      else closeSettings();
       toggle.setAttribute("aria-expanded", open ? "true" : "false");
       toggle.classList.toggle("is-live", open);
-      if (open) {
-        requestAnimationFrame(function () {
-          placeSettingsMenu(toggle, menu);
-        });
-      }
     });
     wrap.appendChild(toggle);
     wrap.appendChild(menu);
     document.body.appendChild(wrap);
-    document.addEventListener("pointerdown", function (ev) {
-      if (!wrap.contains(ev.target)) closeSettings();
-    });
     document.addEventListener("keydown", function (ev) {
       if (ev.key === "Escape") closeSettings();
     });
@@ -830,9 +863,10 @@
     else if (tagRun) paintCap(cap, tagView, "");
     else paintCap(cap, null, selectLine);
     const box = settingsWrap || document.getElementById("album-settings");
+    const menu = document.querySelector(".settings-menu");
     if (box && box.dataset.person === id) {
-      setJobRun(box.querySelector('[data-job="icloud"]'), icloudRun);
-      setJobRun(box.querySelector('[data-job="local"]'), localRun);
+      setJobRun((menu || box).querySelector('[data-job="icloud"]'), icloudRun);
+      setJobRun((menu || box).querySelector('[data-job="local"]'), localRun);
     }
     paintBackdrop();
   }

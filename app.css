@@ -896,6 +896,18 @@ button.apple-next path {
 .settings-menu[hidden] {
   display: none !important;
 }
+.settings-catch {
+  position: fixed;
+  inset: 0;
+  z-index: 100039;
+  background: transparent;
+}
+.settings-catch[hidden] {
+  display: none !important;
+}
+html.settings-open #feed {
+  pointer-events: none;
+}
 .album-settings .settings-toggle {
   width: 34px;
   height: 34px;

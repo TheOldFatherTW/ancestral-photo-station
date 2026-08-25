@@ -1190,13 +1190,13 @@
           ? ""
           : tag.label;
       renderSuggest();
-      input.focus();
-      if (input.value) input.select();
+      if (document.activeElement === input && input.value) input.select();
     }
 
     function enterSearch() {
       node.classList.add("is-searching");
       const target = renameTarget();
+      if (target && !renaming) enterRename(target);
       title.textContent = target && target.kind === "person" ? "這是誰?" : "建議的標籤";
       renderSuggest();
       photoAsk();
@@ -1239,17 +1239,13 @@
       chip.addEventListener("click", function () {
         highlightFace(tag.id);
         showChipX();
-        if (!RENAMEABLE[tag.kind]) {
-          if (renaming) exitRename();
-          return;
-        }
         if (renaming && renaming.id === tag.id) {
           exitRename();
           highlightFace(null);
           showChipX();
           return;
         }
-        enterRename(tag);
+        if (renaming) exitRename();
       });
       wrap.appendChild(chip);
       wrap.appendChild(x);

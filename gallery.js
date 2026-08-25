@@ -659,25 +659,54 @@
     return Math.abs(slide.width / slide.height - nw / nh) < 0.01;
   }
 
+  function rememberShape(slide, nw, nh) {
+    const box = displayBox(nw, nh);
+    if (!slide) return box;
+    slide.width = box.w;
+    slide.height = box.h;
+    if (slide.familyItem) {
+      slide.familyItem.w = nw;
+      slide.familyItem.h = nh;
+    }
+    return box;
+  }
+
+  // Grid tiles keep the real aspect. Index may not have w/h for older shots, and
+  // the 3:2 fallback is what stretched those photos in PhotoSwipe.
+  function refreshSlideShape(slide) {
+    if (!slide || slide.html) return;
+    const img = slide.element && slide.element.querySelector && slide.element.querySelector("img");
+    if (!img || img.naturalWidth < 8 || img.naturalHeight < 8) return;
+    if (sameShape(slide, img.naturalWidth, img.naturalHeight)) return;
+    rememberShape(slide, img.naturalWidth, img.naturalHeight);
+  }
+
   function applySlideSize(content, nw, nh) {
     if (!content) return;
-    const box = displayBox(nw, nh);
+    const box = rememberShape(content.data, nw, nh);
     content.width = box.w;
     content.height = box.h;
-    if (content.data) {
-      content.data.width = box.w;
-      content.data.height = box.h;
-    }
     const slide = content.slide;
     if (!slide) return;
     slide.width = box.w;
     slide.height = box.h;
-    // resize() recalculates the zoom levels from the new shape before redrawing.
-    // Nudging updateContentSize alone left the old zoom behind, and the global
-    // updateSize this used to call re-laid every slide from a neighbour's load
-    // event, which is what warped photos after a few swipes.
-    if (typeof slide.resize === "function") slide.resize();
-    else if (typeof slide.updateContentSize === "function") slide.updateContentSize(true);
+    // Opening animation still owns zoom. Store the real shape and wait.
+    if (!openAnimDone) return;
+    // slide.resize() skips redraw when currZoomLevel !== the *new* initial,
+    // which is exactly the missing-dims case: guessed 3:2, then the JPEG arrives.
+    if (typeof slide.calculateSize === "function") slide.calculateSize();
+    slide.currentResolution = 0;
+    if (typeof slide.zoomAndPanToInitial === "function") slide.zoomAndPanToInitial();
+    if (typeof slide.applyCurrentZoomPan === "function") slide.applyCurrentZoomPan();
+    if (typeof slide.updateContentSize === "function") slide.updateContentSize(true);
+  }
+
+  function fitContentToImage(content) {
+    const el = content && content.element;
+    if (!el || el.tagName !== "IMG" || el.classList.contains("pswp__img--placeholder")) return;
+    if (!el.naturalWidth || !el.naturalHeight) return;
+    if (sameShape(content.slide || content.data, el.naturalWidth, el.naturalHeight)) return;
+    applySlideSize(content, el.naturalWidth, el.naturalHeight);
   }
 
   function monthLabel(group) {
@@ -688,8 +717,7 @@
 
   function slideFor(item, tile) {
     const tileUrl = qs(item, "thumb", "tile");
-    // The real shape comes from the index, so a portrait photo is never handed a
-    // landscape box and then corrected mid-swipe.
+    // Index w/h when known; otherwise a 3:2 guess until the tile or JPEG corrects it.
     const box = displayBox(item.w, item.h);
     if (item.kind === "video") {
       const src = qs(item, "media");
@@ -898,6 +926,7 @@
       return (lightbox._slides && lightbox._slides[index]) || itemData;
     });
     lightbox.on("contentActivate", function (evt) {
+      fitContentToImage(evt.content);
       const el = evt.content && evt.content.element;
       const video = el && el.querySelector && el.querySelector("video");
       if (video && !video.getAttribute("src") && video.getAttribute("data-src")) {
@@ -933,11 +962,7 @@
       }
     });
     lightbox.on("loadComplete", function (evt) {
-      const el = evt.content && evt.content.element;
-      const slide = evt.content && evt.content.slide;
-      if (el && el.naturalWidth && !sameShape(slide, el.naturalWidth, el.naturalHeight)) {
-        applySlideSize(evt.content, el.naturalWidth, el.naturalHeight);
-      }
+      fitContentToImage(evt.content);
       if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
       const curr = lightbox.pswp && lightbox.pswp.currSlide;
       if (curr && evt.content && curr.content === evt.content) syncViewerMedia();
@@ -971,6 +996,8 @@
     });
     lightbox.on("openingAnimationEnd", function () {
       openAnimDone = true;
+      const curr = lightbox.pswp && lightbox.pswp.currSlide;
+      if (curr) fitContentToImage(curr.content);
       syncViewerMedia();
       if (window.FamilyTags && window.FamilyTags.layoutFaces) window.FamilyTags.layoutFaces();
     });
@@ -986,6 +1013,8 @@
       window.setTimeout(function () {
         if (!lightbox.pswp || openAnimDone) return;
         openAnimDone = true;
+        const curr = lightbox.pswp.currSlide;
+        if (curr) fitContentToImage(curr.content);
         syncViewerMedia();
       }, 500);
       pswp.on("resize", function () {
@@ -1154,6 +1183,7 @@
             return;
           }
           if (!lb) return;
+          slides.forEach(refreshSlideShape);
           lb._slides = slides;
           lb.loadAndOpen(index);
           if (item.kind === "video") {

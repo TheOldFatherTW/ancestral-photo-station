@@ -1313,7 +1313,6 @@
 
       const snap = readSnap(viewId);
       if (snap && snap.items && snap.items.length) {
-        total = snap.total || snap.items.length;
         appendItems(snap.items);
         offset = loadedItems.length;
       }
@@ -1333,11 +1332,21 @@
       if (offset) refreshHead();
       else loadMore();
     },
-    filter: function (tagIds) {
+    filter: function (tagIds, opts) {
       const person = (document.getElementById("feed") || {}).dataset.person;
       const next = normalizedTags(tagIds);
       if (!person || trashMode) return;
-      if (person === currentPerson && tagKey(next) === tagKey(currentTags)) return;
+      const force = !!(opts && opts.force);
+      if (!force && person === currentPerson && tagKey(next) === tagKey(currentTags)) {
+        return;
+      }
+      if (force) {
+        const viewId = snapId(person, next, trashMode);
+        delete feedSnaps[viewId];
+        try {
+          localStorage.removeItem(FEED_STORE + viewId);
+        } catch (e) {}
+      }
       window.FamilyFeed.start(person, next);
     },
     refresh: function () {

@@ -266,10 +266,13 @@
   }
 
   function followMerge(src, dst) {
-    const before = tagKey(applied);
+    src = String(src || "");
+    dst = String(dst || "");
+    const hit =
+      (src && applied.indexOf(src) >= 0) || (dst && applied.indexOf(dst) >= 0);
     rewriteIds(selected, src, dst);
     rewriteIds(applied, src, dst);
-    if (tagKey(applied) !== before) feedNeedsSync = true;
+    if (hit) feedNeedsSync = true;
   }
 
   function syncFeedIfNeeded() {
@@ -280,7 +283,7 @@
       modeActive = "all";
       selected.splice(0, selected.length);
     }
-    if (window.FamilyFeed) window.FamilyFeed.filter(applied.slice());
+    if (window.FamilyFeed) window.FamilyFeed.filter(applied.slice(), { force: true });
   }
 
   function setBoardInert(on) {

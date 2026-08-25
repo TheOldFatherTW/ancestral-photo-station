@@ -24,7 +24,7 @@
   });
   const ORIGIN = (window.VAULT_ORIGIN || "").replace(/\/$/, "");
   const KEY_RE = /^[A-Za-z0-9_-]{8,128}$/;
-  const DISCONNECTED = "目前無法連上,請聯絡維護的那個傢伙";
+  const DISCONNECTED = "維護中,請5分鐘後再試";
   const BAD_PASS = "Apple帳號密碼錯誤";
   const statusEl = document.getElementById("status");
   const hall = document.getElementById("hall");
@@ -231,6 +231,14 @@
       return;
     }
     if (goBtn) goBtn.hidden = false;
+  }
+
+  function showOffline() {
+    hideAllInvite();
+    busy = false;
+    codeSent = false;
+    if (statusEl) statusEl.textContent = DISCONNECTED;
+    if (window.FAMILY_FORCE_INVITE || !window.FAMILY_VIEW_KEY) showInviteChrome();
   }
 
   function showPass(err) {
@@ -463,8 +471,7 @@
         return;
       }
       if (!ORIGIN) {
-        fail(DISCONNECTED);
-        startInvite(urlK);
+        showOffline();
         return;
       }
       readJson("/api/door", urlK)
@@ -473,12 +480,15 @@
             startInvite(urlK);
             return;
           }
-          fail((x.j && x.j.error) === "need_key" ? "請用給你的專用連結打開" : DISCONNECTED);
-          startInvite(urlK);
+          if ((x.j && x.j.error) === "need_key") {
+            fail("請用給你的專用連結打開");
+            startInvite(urlK);
+            return;
+          }
+          showOffline();
         })
         .catch(function () {
-          startInvite(urlK);
-          fail(DISCONNECTED);
+          showOffline();
         });
       return;
     }
@@ -498,8 +508,17 @@
     readJson("/api/door", probe)
       .then(function (x) {
         if (!x.res.ok || !x.j || !x.j.kind) {
-          fail((x.j && x.j.error) === "need_key" ? "請用給你的專用連結打開" : DISCONNECTED);
-          if (!urlK && window.FamilyDoor && window.FamilyDoor.boot) window.FamilyDoor.boot();
+          if ((x.j && x.j.error) === "need_key") {
+            fail("請用給你的專用連結打開");
+            if (!urlK && window.FamilyDoor && window.FamilyDoor.boot) window.FamilyDoor.boot();
+            return;
+          }
+          fail(DISCONNECTED);
+          if (stored && window.FamilyDoor && window.FamilyDoor.boot) {
+            window.FamilyDoor.boot();
+            return;
+          }
+          if (urlK) showOffline();
           return;
         }
         if (x.j.kind === "invite") {
@@ -511,14 +530,14 @@
         showHomeInstallIfNeeded();
       })
       .catch(function () {
-        if (urlK) {
-          startInvite(urlK);
-          fail(DISCONNECTED);
+        fail(DISCONNECTED);
+        if (stored && window.FamilyDoor && window.FamilyDoor.boot) {
+          window.FamilyDoor.boot();
+          showHomeInstallIfNeeded();
           return;
         }
-        fail(DISCONNECTED);
-        if (stored && window.FamilyDoor && window.FamilyDoor.boot) window.FamilyDoor.boot();
-        showHomeInstallIfNeeded();
+        if (urlK) showOffline();
+        else showHomeInstallIfNeeded();
       });
   }
 

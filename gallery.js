@@ -1332,8 +1332,11 @@
         } catch (err) {
           if (my !== run) return;
           if (!offset) {
-            feed.innerHTML =
-              '<p class="feed-empty">目前無法連上,請聯絡維護的那個傢伙</p>';
+            const empty = document.createElement("p");
+            empty.className = "feed-empty is-offline";
+            empty.textContent = "維護中,請5分鐘後再試";
+            feed.innerHTML = "";
+            feed.appendChild(empty);
           }
         } finally {
           loading = false;

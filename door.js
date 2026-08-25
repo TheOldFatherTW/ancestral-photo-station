@@ -1,7 +1,7 @@
 (function () {
   const ORIGIN = (window.VAULT_ORIGIN || "").replace(/\/$/, "");
   const NEED_LINK = "請用給你的專用連結打開";
-  const DISCONNECTED = "目前無法連上,請聯絡維護的那個傢伙";
+  const DISCONNECTED = "維護中,請5分鐘後再試";
   const CHECK =
     '<span class="ios-check" aria-label="已同步"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#34c759"/><path fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M7.2 12.4l3.1 3.2 6.5-7.2"/></svg></span>';
   const statusEl = document.getElementById("status");
@@ -143,7 +143,18 @@
   }
 
   function fail(msg) {
-    if (statusEl) statusEl.textContent = msg || DISCONNECTED;
+    const text = msg || DISCONNECTED;
+    if (!statusEl) return;
+    const hall = document.getElementById("hall");
+    const albumView =
+      hall &&
+      !hall.classList.contains("is-booting") &&
+      !hall.classList.contains("is-invite");
+    if (albumView && text === DISCONNECTED) {
+      statusEl.textContent = "";
+      return;
+    }
+    statusEl.textContent = text;
   }
 
   function isBooting() {

@@ -379,6 +379,27 @@ button.apple-next path {
   color: var(--mute);
   padding: 24px;
 }
+.hall.with-feed:not(.is-invite):not(.is-booting):has(.feed-empty.is-offline) {
+  min-height: 100vh;
+}
+#album:has(.feed-empty.is-offline) {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.feed:has(.feed-empty.is-offline) {
+  flex: 1;
+  align-content: center;
+  margin-top: 0;
+}
+.hall.is-invite .status {
+  margin: 22px 0 0;
+  font-size: clamp(18px, 5.4vw, 22px);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
 .profile {
   width: min(420px, 100%);
   text-align: center;

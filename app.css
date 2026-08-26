@@ -1790,15 +1790,35 @@ button.tag-chip {
   font-weight: 700;
 }
 button.batch-tag-close {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
   width: 34px;
   height: 34px;
   margin: 0;
   padding: 0;
+  overflow: hidden;
+  border: 0;
   border-radius: 50%;
   background: #f2f2f7;
-  color: var(--ink);
-  font-size: 24px;
-  line-height: 1;
+  color: transparent;
+  font-size: 0;
+  line-height: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+button.batch-tag-close::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  background:
+    linear-gradient(var(--ink), var(--ink)) center / 12px 1.5px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) center / 1.5px 12px no-repeat;
+  transform: translate(-50%, -50%) rotate(45deg);
+  pointer-events: none;
 }
 .list-tag-mask {
   padding-left: 0;
@@ -2034,22 +2054,31 @@ button.batch-tag-close {
 }
 @media (min-width: 600px) and (pointer: coarse) {
   html.has-rail .tag-board {
-    padding-right: calc(80px + env(safe-area-inset-right, 0px));
+    padding-right: calc(88px + env(safe-area-inset-right, 0px));
   }
   .photo-rail {
     gap: 18px;
   }
   .photo-rail .ins-icon {
-    width: 56px;
-    height: 56px;
-    flex-basis: 56px;
+    width: 64px;
+    height: 64px;
+    flex-basis: 64px;
   }
   .photo-rail .ins-face {
     inset: 4px;
   }
   .photo-rail .ins-icon svg {
-    width: 22px;
-    height: 22px;
+    width: 25px;
+    height: 25px;
+  }
+  .album-settings .settings-toggle {
+    width: 39px;
+    height: 39px;
+    flex-basis: 39px;
+  }
+  .album-settings .settings-toggle svg {
+    width: 18px;
+    height: 18px;
   }
 }
 @media (min-width: 768px) {

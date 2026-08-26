@@ -1096,7 +1096,7 @@
         bar.className = "trash-bar";
         const back = document.createElement("button");
         back.type = "button";
-        back.className = "ins-icon trash-back";
+        back.className = "ins-icon nav-back";
         back.setAttribute("aria-label", "返回相簿");
         back.innerHTML =
           '<span class="ins-ring"></span><span class="ins-face"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5L8 12l6.5 6.5M8.5 12H20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';

@@ -373,7 +373,7 @@ button.apple-next path {
   margin: 0 0 8px;
   padding: 4px 0 8px;
 }
-.trash-bar button.trash-back {
+.trash-bar button.nav-back {
   margin: 0;
   width: 40px;
   height: 40px;
@@ -911,6 +911,8 @@ button.apple-next path {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex: 1;
+  min-width: 0;
 }
 .album-head h2 { margin: 0; }
 .album-settings {
@@ -1066,6 +1068,18 @@ button.back {
 }
 .err { color: #ed4956; }
 .wrap { max-width: 720px; margin: 0 auto; padding: 20px 16px 48px; }
+.album-bar.wrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.album-bar .nav-back {
+  margin: 0;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.18));
+}
 .album-bar[hidden],
 .back[hidden],
 .local-cabs[hidden],

@@ -25,7 +25,7 @@
 <link rel="icon" href="./rose-two.svg" type="image/svg+xml"/>
 <link rel="apple-touch-icon" href="./icons/rose-two-180.png"/>
 <link rel="stylesheet" href="./vendor/photoswipe/photoswipe.css"/>
-<link rel="stylesheet" href="./app.css?v=77"/>
+<link rel="stylesheet" href="./app.css?v=78"/>
 <script src="./config.js?v=1787650964"></script>
 <script>
 (function () {
@@ -134,8 +134,13 @@
   </div>
   <div class="tag-board" id="tag-board" hidden></div>
   <div id="album" hidden>
-    <div class="wrap album-bar" style="padding-top:8px">
-      <button type="button" class="back">← 全部櫃子</button>
+    <div class="wrap album-bar">
+      <button type="button" class="ins-icon nav-back" aria-label="返回">
+        <span class="ins-ring"></span>
+        <span class="ins-face">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5L8 12l6.5 6.5M8.5 12H20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+      </button>
       <div class="album-head">
         <h2 id="album-title"></h2>
       </div>
@@ -153,10 +158,10 @@
 <script src="./vendor/photoswipe/photoswipe.umd.min.js"></script>
 <script src="./vendor/photoswipe/photoswipe-lightbox.umd.min.js"></script>
 <script src="./rose-two.js?v=22"></script>
-<script src="./gallery.js?v=58"></script>
+<script src="./gallery.js?v=59"></script>
 <script src="./tags.js?v=68"></script>
 <script src="./gate.js?v=14"></script>
-<script src="./door.js?v=63"></script>
+<script src="./door.js?v=64"></script>
 <script>
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js?v=45");

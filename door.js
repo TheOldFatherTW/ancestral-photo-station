@@ -90,7 +90,7 @@
     const solo = !!onlyPerson();
     const homeWrap = document.querySelector(".local-cabs");
     const bar = document.querySelector(".album-bar");
-    const back = document.querySelector("#album .back");
+    const back = document.querySelector("#album .nav-back");
     if (homeWrap) {
       homeWrap.hidden = false;
       homeWrap.classList.toggle("solo", solo);
@@ -1135,7 +1135,7 @@
     },
   };
   window.addEventListener("hashchange", route);
-  const back = document.querySelector("#album .back");
+  const back = document.querySelector("#album .nav-back");
   if (back) {
     back.addEventListener("click", function (ev) {
       ev.preventDefault();

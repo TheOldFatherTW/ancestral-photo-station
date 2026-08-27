@@ -1182,7 +1182,6 @@
         a.addEventListener("click", function (ev) {
           ev.preventDefault();
           if (fromHold) {
-            fromHold = false;
             return;
           }
           if (selecting) {

@@ -25,7 +25,7 @@
 <link rel="icon" href="./rose-two.svg" type="image/svg+xml"/>
 <link rel="apple-touch-icon" href="./icons/rose-two-180.png"/>
 <link rel="stylesheet" href="./vendor/photoswipe/photoswipe.css"/>
-<link rel="stylesheet" href="./app.css?v=83"/>
+<link rel="stylesheet" href="./app.css?v=84"/>
 <script src="./config.js?v=1787650964"></script>
 <script>
 (function () {
@@ -165,6 +165,15 @@
 <aside class="photo-rail" id="photo-rail" hidden aria-label="照片操作"></aside>
 <input id="cover-input" type="file" accept="image/*" hidden/>
 <input id="backdrop-input" type="file" accept="image/*" hidden/>
+<div class="batch-tag-mask" id="waitMask" hidden>
+  <div class="batch-tag-sheet is-wait" id="waitSheet">
+    <div class="batch-tag-head">
+      <p id="waitTitle">更換背景中</p>
+    </div>
+    <p class="wait-pct" id="waitPct">0%</p>
+    <div class="thinking-five" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+  </div>
+</div>
 <div class="home-install" id="home-install" hidden>
   <p>請點底部分享，再選加入主畫面</p>
   <button type="button" class="invite-go" id="home-installed">我已加入</button>
@@ -172,10 +181,10 @@
 <script src="./vendor/photoswipe/photoswipe.umd.min.js"></script>
 <script src="./vendor/photoswipe/photoswipe-lightbox.umd.min.js"></script>
 <script src="./rose-two.js?v=22"></script>
-<script src="./gallery.js?v=61"></script>
-<script src="./tags.js?v=69"></script>
+<script src="./gallery.js?v=62"></script>
+<script src="./tags.js?v=70"></script>
 <script src="./gate.js?v=14"></script>
-<script src="./door.js?v=65"></script>
+<script src="./door.js?v=66"></script>
 <script>
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js?v=45");

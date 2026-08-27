@@ -6,6 +6,8 @@
     '<svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="18"/><path d="M15.2 11.5L22.5 18l-7.3 6.5"/></svg>';
   const MAG =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M15.2 15.2L20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  const HEART =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20C10.5 18.4 7.3 15.8 5.4 11.9C4 9.1 5.2 6 8.4 6c1.8 0 3 1.1 3.6 2.2C12.6 7.1 13.8 6 15.6 6c3.2 0 4.4 3.1 3 5.9C16.7 15.8 13.5 18.4 12 20Z"/></svg>';
   const CHEV =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   let person = "";
@@ -612,8 +614,12 @@
     const btn = document.createElement("button");
     btn.type = "button";
     btn.dataset.mode = id;
-    btn.className = "mode-btn" + (id === "find" ? " mode-find" : "");
-    if (id === "find") {
+    btn.className = "mode-btn" + (id === "find" ? " mode-find" : "") + (id === "fav" ? " mode-heart" : "");
+    if (id === "fav") {
+      btn.innerHTML = HEART;
+      btn.setAttribute("aria-label", "愛心");
+      if (modeActive === "fav") btn.classList.add("is-on");
+    } else if (id === "find") {
       btn.innerHTML = MAG + "<span>" + (selected.length ? "加標籤？" : "找標籤？") + "</span>";
       if (finding) btn.classList.add("is-on");
     } else {
@@ -621,6 +627,18 @@
       if (modeActive === id) btn.classList.add("is-on");
     }
     btn.addEventListener("click", function () {
+      if (id === "fav") {
+        closeFind({ repaint: false });
+        closeList();
+        modeActive = "fav";
+        mode = "all";
+        selected.splice(0, selected.length);
+        applied = [];
+        const person = (document.getElementById("feed") || {}).dataset.person;
+        if (person && window.FamilyFeed) window.FamilyFeed.start(person, [], { fav: true });
+        paint(lastBoard);
+        return;
+      }
       if (id === "all") {
         backToAll();
         return;
@@ -661,6 +679,7 @@
     board.innerHTML = "";
     const bar = document.createElement("div");
     bar.className = "mode-bar";
+    bar.appendChild(modeBtn("fav", "愛心"));
     bar.appendChild(modeBtn("all", "All"));
     bar.appendChild(modeBtn("list", "List"));
     bar.appendChild(modeBtn("find", selected.length ? "加標籤？" : "找標籤？"));

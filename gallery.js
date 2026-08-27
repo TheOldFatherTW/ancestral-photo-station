@@ -8,6 +8,8 @@
   const FEED_STORE = "famiphoto.feed.v1.";
   const FEED_KEEP = 96;
   const SKIP_TRASH_KEY = "family.skipTrashAsk";
+  const HEART =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20C10.5 18.4 7.3 15.8 5.4 11.9C4 9.1 5.2 6 8.4 6c1.8 0 3 1.1 3.6 2.2C12.6 7.1 13.8 6 15.6 6c3.2 0 4.4 3.1 3 5.9C16.7 15.8 13.5 18.4 12 20Z"/></svg>';
   let run = 0;
   let lightbox;
   let thumbActive = 0;
@@ -20,6 +22,7 @@
   let currentTags = [];
   let beforeTrashTags = [];
   let trashMode = false;
+  let favMode = false;
   let selecting = false;
   let viewing = false;
   let picked = {};
@@ -113,8 +116,8 @@
     );
   }
 
-  function snapId(person, tagIds, trash) {
-    return person + "|" + (trash ? "1" : "0") + "|" + tagKey(tagIds);
+  function snapId(person, tagIds, trash, fav) {
+    return person + "|" + (trash ? "1" : "0") + "|" + (fav ? "f" : "0") + "|" + tagKey(tagIds);
   }
 
   function readSnap(id) {
@@ -1084,10 +1087,12 @@
       currentPerson = person;
       currentTags = tagIds;
       trashMode = !!(opts && opts.trash);
+      favMode = !!(opts && opts.fav) && !trashMode;
       document.documentElement.classList.toggle("trash-open", trashMode);
       feed.dataset.trash = trashMode ? "1" : "";
+      feed.dataset.fav = favMode ? "1" : "";
       feed.classList.toggle("is-trash", trashMode);
-      if (!trashMode && window.FamilyTags && window.FamilyTags.setApplied) {
+      if (!trashMode && !(opts && opts.fav) && window.FamilyTags && window.FamilyTags.setApplied) {
         window.FamilyTags.setApplied(tagIds);
       }
       if (!opts || !opts.keepSelect) clearSelect();
@@ -1106,7 +1111,7 @@
         bar.appendChild(back);
         feed.appendChild(bar);
       }
-      const viewId = snapId(person, tagIds, trashMode);
+      const viewId = snapId(person, tagIds, trashMode, favMode);
       if (pins.length) {
         delete feedSnaps[viewId];
         try {
@@ -1144,6 +1149,12 @@
         shield.className = "tile-shield";
         a.appendChild(img);
         a.appendChild(shield);
+        if (item.favorite && !trashMode) {
+          const heart = document.createElement("span");
+          heart.className = "tile-heart";
+          heart.innerHTML = HEART;
+          a.appendChild(heart);
+        }
         markTile(a, selecting && picked[a.dataset.key]);
         let press = 0;
         let sx = 0;
@@ -1247,7 +1258,9 @@
         empty.className = "feed-empty";
         empty.textContent = trashMode
           ? "垃圾桶是空的。"
-          : "這個櫃子還沒有照片。";
+          : favMode
+            ? "還沒有最愛。"
+            : "這個櫃子還沒有照片。";
         if (!trashMode) feed.innerHTML = "";
         feed.appendChild(empty);
       }
@@ -1275,6 +1288,7 @@
             FIRST;
           if (tags.length) path += "&tags=" + tags.map(encodeURIComponent).join(",");
           if (trashMode) path += "&trash=1";
+          if (favMode) path += "&fav=1";
           const res = await fetch(api(path));
           const data = await res.json();
           if (my !== run) return;
@@ -1314,6 +1328,7 @@
             (offset ? LIMIT : FIRST);
           if (tags.length) path += "&tags=" + tags.map(encodeURIComponent).join(",");
           if (trashMode) path += "&trash=1";
+          if (favMode) path += "&fav=1";
           const url = api(path);
           const res = await fetch(url);
           const data = await res.json();
@@ -1378,22 +1393,28 @@
       const next = normalizedTags(tagIds);
       if (!person || trashMode) return;
       const force = !!(opts && opts.force);
-      if (!force && person === currentPerson && tagKey(next) === tagKey(currentTags)) {
+      const fav = !!(opts && opts.fav);
+      if (
+        !force &&
+        person === currentPerson &&
+        tagKey(next) === tagKey(currentTags) &&
+        fav === favMode
+      ) {
         return;
       }
       if (force) {
-        const viewId = snapId(person, next, trashMode);
+        const viewId = snapId(person, next, trashMode, fav);
         delete feedSnaps[viewId];
         try {
           localStorage.removeItem(FEED_STORE + viewId);
         } catch (e) {}
       }
-      window.FamilyFeed.start(person, next);
+      window.FamilyFeed.start(person, next, { fav: fav });
     },
     refresh: function () {
       if (!currentPerson) return;
       if (lightbox && lightbox.pswp) lightbox.pswp.close();
-      window.FamilyFeed.start(currentPerson, currentTags, { trash: trashMode });
+      window.FamilyFeed.start(currentPerson, currentTags, { trash: trashMode, fav: favMode });
     },
     prepareAction: function () {
       return prepareAction();
@@ -1495,6 +1516,48 @@
       if (trashMode) return Promise.resolve();
       if (!prepareAction()) return Promise.resolve();
       return saveItems(targetItems());
+    },
+    toggleHeart: function () {
+      if (trashMode) return Promise.resolve();
+      const rows = targetRows();
+      if (!rows.length) {
+        prepareAction();
+        return Promise.resolve();
+      }
+      const items = targetItems();
+      const allOn = items.every(function (it) { return it.favorite; });
+      return fetch(api("/api/favorite"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ on: !allOn, photos: rows, person: currentPerson }),
+      }).then(function (res) {
+        if (!res.ok) throw new Error("fail");
+        return res.json();
+      }).then(function () {
+        items.forEach(function (it) { it.favorite = !allOn; });
+        if (favMode && allOn) {
+          window.FamilyFeed.start(currentPerson, currentTags, { fav: true, keepSelect: false });
+          return;
+        }
+        const feed = document.getElementById("feed");
+        if (!feed) return;
+        feed.querySelectorAll(".tile").forEach(function (a) {
+          const hit = items.some(function (it) { return itemKey(it) === a.dataset.key; });
+          if (!hit) return;
+          const mark = a.querySelector(".tile-heart");
+          if (!allOn && !mark) {
+            const heart = document.createElement("span");
+            heart.className = "tile-heart";
+            heart.innerHTML = HEART;
+            a.appendChild(heart);
+          } else if (allOn && mark) {
+            mark.remove();
+          }
+        });
+        clearSelect();
+      }).catch(function () {
+        window.FamilyBusy.done("最愛沒加上，請再試一次");
+      });
     },
     openTrash: function () {
       if (!currentPerson) return;

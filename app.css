@@ -1211,6 +1211,19 @@ html.has-rail .tag-board {
   box-shadow: none;
   background: linear-gradient(120deg, #fa7e1e 0%, #d62976 48%, #962fbf 100%);
 }
+.mode-btn.mode-heart {
+  padding: 8px 11px;
+  color: #d62976;
+}
+.mode-btn.mode-heart svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  fill: currentColor;
+}
+.mode-btn.mode-heart.is-on {
+  color: #fff;
+}
 button.tag-apply {
   position: relative;
   isolation: isolate;
@@ -1843,6 +1856,19 @@ button.tag-chip {
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 16px 44px rgba(0, 0, 0, 0.26);
   -webkit-overflow-scrolling: touch;
+}
+.batch-tag-sheet.is-wait {
+  text-align: center;
+}
+.wait-pct {
+  margin: 8px 0 4px;
+  font-size: 28px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.batch-tag-sheet.is-wait .thinking-five {
+  margin: 12px 0 4px;
 }
 .kb-up .batch-tag-mask {
   top: var(--vv-top, 0px);

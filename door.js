@@ -56,6 +56,10 @@
     '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M5.5 16.2l4.2-4.6 3 3.2 2.2-2.4 3.6 3.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="9" cy="9.2" r="1.3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
   const PERSON =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.4" r="3.1" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M6.2 18.6c.9-3.3 3.2-5 5.8-5s4.9 1.7 5.8 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+  const HEART =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20C10.5 18.4 7.3 15.8 5.4 11.9C4 9.1 5.2 6 8.4 6c1.8 0 3 1.1 3.6 2.2C12.6 7.1 13.8 6 15.6 6c3.2 0 4.4 3.1 3 5.9C16.7 15.8 13.5 18.4 12 20Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>';
+  let waitBusy = false;
+  let waitTimer = 0;
 
   function api(path) {
     const url = ORIGIN + path;
@@ -202,11 +206,11 @@
       if (p.has_cover) {
         faceImg.alt = p.display_name || "";
         faceImg.src = api("/cover?person=" + encodeURIComponent(p.id) + "&v=" + (p.cover_rev || 0));
-        faceImg.hidden = false;
       } else {
-        faceImg.removeAttribute("src");
-        faceImg.hidden = true;
+        faceImg.alt = p.display_name || "";
+        faceImg.src = "./face-default.jpg";
       }
+      faceImg.hidden = false;
     }
     if (faceEmpty) faceEmpty.hidden = true;
     paintStage(p);
@@ -372,25 +376,31 @@
   }
 
   async function uploadBackdrop(person, file) {
+    if (waitBusy) return;
+    waitBusy = true;
     const body = new FormData();
     body.append("backdrop", file, file.name || "backdrop.jpg");
     const entry = document.querySelector('.settings-entry[data-job="backdrop"]');
+    showWaitCard("更換背景中");
+    waitTimer = window.setInterval(tickWait, 280);
     setJobRun(entry, true);
     try {
-      const res = await fetch(api("/api/backdrop?person=" + encodeURIComponent(person)), {
-        method: "POST",
-        body: body,
+      await postFile(api("/api/backdrop?person=" + encodeURIComponent(person)), body, function (n) {
+        if (waitTimer) {
+          window.clearInterval(waitTimer);
+          waitTimer = 0;
+        }
+        setWaitPct(n);
       });
-      const data = await res.json().catch(function () {
-        return {};
-      });
-      if (!res.ok) throw new Error(data.error || "fail");
+      setWaitPct(100);
       lastCab = "";
       await boot();
     } catch (err) {
       fail("背景換不上，請再選一次，或確認家裡這台有開");
     } finally {
+      hideWaitCard();
       setJobRun(entry, false);
+      waitBusy = false;
     }
   }
 
@@ -655,6 +665,53 @@
     entry.setAttribute("aria-disabled", on ? "true" : "false");
     const badge = entry.querySelector(".ins-icon");
     if (badge) badge.classList.toggle("is-run", !!on);
+  }
+
+  function showWaitCard(title) {
+    const mask = document.getElementById("waitMask");
+    const head = document.getElementById("waitTitle");
+    const pct = document.getElementById("waitPct");
+    if (head) head.textContent = title || "更換背景中";
+    if (pct) pct.textContent = "0%";
+    if (mask) mask.hidden = false;
+  }
+
+  function setWaitPct(n) {
+    const pct = document.getElementById("waitPct");
+    if (pct) pct.textContent = Math.max(0, Math.min(100, Math.round(n))) + "%";
+  }
+
+  function hideWaitCard() {
+    const mask = document.getElementById("waitMask");
+    if (mask) mask.hidden = true;
+    if (waitTimer) {
+      window.clearInterval(waitTimer);
+      waitTimer = 0;
+    }
+  }
+
+  function tickWait() {
+    const pct = document.getElementById("waitPct");
+    const n = parseInt((pct && pct.textContent) || "0", 10) || 0;
+    if (n < 90) setWaitPct(n + 1);
+  }
+
+  function postFile(url, body, onPct) {
+    return new Promise(function (resolve, reject) {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", url);
+      xhr.onload = function () {
+        if (xhr.status >= 200 && xhr.status < 300) resolve(xhr);
+        else reject(new Error("fail"));
+      };
+      xhr.onerror = function () { reject(new Error("net")); };
+      if (xhr.upload) {
+        xhr.upload.onprogress = function (ev) {
+          if (ev.lengthComputable && ev.total) onPct(Math.round((ev.loaded / ev.total) * 100));
+        };
+      }
+      xhr.send(body);
+    });
   }
 
   function ensureSettings() {
@@ -1196,6 +1253,13 @@
     rail.appendChild(hash);
     rail.appendChild(trash);
     rail.appendChild(down);
+    const heart = insButton("rail-heart", HEART, "愛心");
+    heart.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (window.FamilyFeed && window.FamilyFeed.toggleHeart) window.FamilyFeed.toggleHeart();
+    });
+    rail.appendChild(heart);
     return rail;
   }
 

@@ -127,7 +127,7 @@ body {
   left: 50%;
   top: 0;
   width: 100vw;
-  height: 100%;
+  height: 280px;
   transform: translateX(-50%);
   z-index: 0;
   pointer-events: none;
@@ -145,7 +145,8 @@ body {
 .hall.is-invite .home-head,
 .hall.is-invite .local-cabs,
 .hall.is-invite #album,
-.hall.is-invite .tag-board {
+.hall.is-invite .tag-board,
+.hall.is-invite .stage-bg {
   display: none !important;
 }
 .invite-panel {
@@ -500,7 +501,8 @@ button.apple-next path {
 .hall.with-feed.is-booting .home-head,
 .hall.with-feed.is-booting .local-cabs,
 .hall.with-feed.is-booting #album,
-.hall.with-feed.is-booting .tag-board {
+.hall.with-feed.is-booting .tag-board,
+.hall.with-feed.is-booting .stage-bg {
   display: none !important;
 }
 .hall.with-feed.is-booting .rose-two,
@@ -1847,6 +1849,9 @@ button.tag-chip {
   touch-action: none;
   overscroll-behavior: none;
 }
+.batch-tag-mask[hidden] {
+  display: none !important;
+}
 .batch-tag-sheet {
   width: var(--sheet-action-width);
   max-height: calc(100vh - 32px);
@@ -2053,6 +2058,9 @@ button.batch-tag-close::before {
   justify-content: center;
   padding: 24px;
   background: rgba(0, 0, 0, 0.4);
+}
+.ask-mask[hidden] {
+  display: none !important;
 }
 .ask-card {
   width: min(300px, 100%);

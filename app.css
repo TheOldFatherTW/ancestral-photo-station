@@ -315,6 +315,30 @@ button.apple-next path {
 .tile img.is-on {
   opacity: 1;
 }
+.tile-heart {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  color: #d62976;
+  filter: drop-shadow(0 1px 1.2px rgba(0, 0, 0, 0.33));
+}
+.tile-heart svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+  overflow: visible;
+  fill: currentColor;
+  stroke: #fff;
+  stroke-width: 3.2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  paint-order: stroke fill;
+}
 .tile-shield,
 .cab-shield {
   position: absolute;
@@ -2079,6 +2103,10 @@ button.batch-tag-close::before {
   .album-settings .settings-toggle svg {
     width: 18px;
     height: 18px;
+  }
+  .tile-heart svg {
+    width: 32px;
+    height: 32px;
   }
 }
 @media (min-width: 768px) {

@@ -208,7 +208,7 @@
         faceImg.src = api("/cover?person=" + encodeURIComponent(p.id) + "&v=" + (p.cover_rev || 0));
       } else {
         faceImg.alt = p.display_name || "";
-        faceImg.src = "./face-default.jpg";
+        faceImg.src = "./face-default.jpg?v=2";
       }
       faceImg.hidden = false;
     }

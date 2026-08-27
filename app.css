@@ -803,6 +803,9 @@ button.apple-next path {
   font-weight: 600;
   color: var(--mute);
 }
+.cab-empty-name[hidden] {
+  display: none !important;
+}
 .ins-icon {
   position: relative;
   width: 40px;
@@ -1212,19 +1215,6 @@ html.has-rail .tag-board {
   color: #fff;
   box-shadow: none;
   background: linear-gradient(120deg, #fa7e1e 0%, #d62976 48%, #962fbf 100%);
-}
-.mode-btn.mode-heart {
-  padding: 8px 11px;
-  color: #d62976;
-}
-.mode-btn.mode-heart svg {
-  width: 16px;
-  height: 16px;
-  display: block;
-  fill: currentColor;
-}
-.mode-btn.mode-heart.is-on {
-  color: #fff;
 }
 button.tag-apply {
   position: relative;

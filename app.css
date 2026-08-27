@@ -191,10 +191,31 @@ button.invite-go {
   align-items: center;
   gap: 10px;
 }
-.apple-row input {
+.apple-row input,
+.apple-row textarea {
   flex: 1;
   min-width: 0;
   margin: 0;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: normal;
+  -webkit-appearance: none;
+  appearance: none;
+  box-shadow: none;
+  outline: none;
+  background-clip: padding-box;
+}
+.apple-row textarea {
+  min-height: 88px;
+  height: auto;
+  padding: 10px 14px;
+  resize: none;
+  line-height: 1.4;
 }
 button.apple-next {
   flex: 0 0 44px;
@@ -1473,6 +1494,9 @@ button.tag-chip {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+.list-tag-sheet .tag-row {
+  margin: 0 0 16px;
 }
 .pswp-face-layer {
   position: absolute;

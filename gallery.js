@@ -1165,7 +1165,8 @@
           press = window.setTimeout(function () {
             press = 0;
             fromHold = true;
-            enterSelect(item, a);
+            if (selecting) toggleSelect(item, a);
+            else enterSelect(item, a);
           }, 400);
         });
         a.addEventListener("pointermove", function (ev) {

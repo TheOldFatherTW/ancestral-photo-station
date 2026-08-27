@@ -5,15 +5,23 @@
   const CHECK =
     '<span class="ios-check" aria-label="已同步"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#34c759"/><path fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M7.2 12.4l3.1 3.2 6.5-7.2"/></svg></span>';
   const statusEl = document.getElementById("status");
-  const cabs = document.getElementById("cabinets");
+  const hall = document.getElementById("hall");
+  const homeHead = document.getElementById("home-head");
+  const cabHud = document.getElementById("cab-hud");
+  const faceImg = document.getElementById("face-img");
+  const faceEmpty = document.getElementById("face-empty");
+  const readerName = document.getElementById("reader-name");
   const album = document.getElementById("album");
-  const albumTitle = document.getElementById("album-title");
   const feed = document.getElementById("feed");
+  const coverInputEl = document.getElementById("cover-input");
+  const backdropInput = document.getElementById("backdrop-input");
+  const stageBg = document.getElementById("stage-bg");
   let openPerson = "";
   let names = {};
   let lastCab = "";
-  let coverInput = null;
+  let coverInput = coverInputEl;
   let coverPerson = "";
+  let backdropUrl = "";
   let uploadInput = null;
   let uploadPerson = "";
   let uploadBtn = null;
@@ -44,6 +52,10 @@
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 11.5L12 16l4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 19.5h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
   const GEAR =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.6 3.8l.6-1.3h3.6l.6 1.3 1.6.7 1.4-.5 2.5 2.5-.5 1.4.7 1.6 1.3.6v3.6l-1.3.6-.7 1.6.5 1.4-2.5 2.5-1.4-.5-1.6.7-.6 1.3h-3.6l-.6-1.3-1.6-.7-1.4.5-2.5-2.5.5-1.4-.7-1.6-1.3-.6v-3.6l1.3-.6.7-1.6-.5-1.4L6.6 4l1.4.5 1.6-.7z" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linejoin="round"/><circle cx="12" cy="11.9" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
+  const SCENE =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M5.5 16.2l4.2-4.6 3 3.2 2.2-2.4 3.6 3.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="9" cy="9.2" r="1.3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
+  const PERSON =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.4" r="3.1" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M6.2 18.6c.9-3.3 3.2-5 5.8-5s4.9 1.7 5.8 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
 
   function api(path) {
     const url = ORIGIN + path;
@@ -81,63 +93,161 @@
     return /^[a-z][a-z0-9-]{0,31}$/.test(h) ? h : "";
   }
 
-  function onlyPerson() {
-    const ids = Object.keys(names);
-    return ids.length === 1 ? ids[0] : "";
+  function personIds() {
+    return Object.keys(names);
   }
 
-  function paintSoloChrome() {
-    const solo = !!onlyPerson();
-    const homeWrap = document.querySelector(".local-cabs");
-    const bar = document.querySelector(".album-bar");
-    const back = document.querySelector("#album .nav-back");
-    if (homeWrap) {
-      homeWrap.hidden = false;
-      homeWrap.classList.toggle("solo", solo);
+  function primaryPersonId() {
+    const ids = personIds();
+    const host = ids.find(function (id) {
+      return latestPeople[id] && latestPeople[id].host;
+    });
+    return host || ids[0] || "";
+  }
+
+  function hudFor(person) {
+    if (person && openPerson && person !== openPerson) return null;
+    return cabHud;
+  }
+
+  function layoutStage() {
+    if (!stageBg || stageBg.hidden) return;
+    const head = homeHead || stageBg.parentElement;
+    if (!head) return;
+    const headBox = head.getBoundingClientRect();
+    const tags = document.getElementById("tag-board");
+    const startBox = tags && !tags.hidden ? tags.getBoundingClientRect() : null;
+    const start = startBox ? Math.max(0, startBox.top - headBox.top) : Math.round(headBox.height * 0.55);
+    const end = Math.max(start + 24, headBox.height);
+    const fade = "linear-gradient(to bottom, #000 0, #000 " + Math.round(start) + "px, transparent " + Math.round(end) + "px)";
+    stageBg.style.webkitMaskImage = fade;
+    stageBg.style.maskImage = fade;
+    if (backdropUrl) tuneNameOnBackdrop(backdropUrl);
+  }
+
+  function lumaBehindName(img, stage, nameEl) {
+    const stageBox = stage.getBoundingClientRect();
+    const nameBox = nameEl.getBoundingClientRect();
+    const iw = img.naturalWidth;
+    const ih = img.naturalHeight;
+    if (stageBox.width < 8 || nameBox.height < 4 || !iw || !ih) return null;
+    const scale = Math.max(stageBox.width / iw, stageBox.height / ih);
+    const ox = (stageBox.width - iw * scale) / 2;
+    const pad = 10;
+    const sx = (nameBox.left - stageBox.left - ox - pad) / scale;
+    const sy = (nameBox.top - stageBox.top - pad) / scale;
+    const sw = (nameBox.width + pad * 2) / scale;
+    const sh = (nameBox.height + pad * 2) / scale;
+    const x = Math.max(0, Math.min(iw - 1, sx));
+    const y = Math.max(0, Math.min(ih - 1, sy));
+    const w = Math.max(1, Math.min(iw - x, sw));
+    const h = Math.max(1, Math.min(ih - y, sh));
+    const canvas = document.createElement("canvas");
+    canvas.width = 24;
+    canvas.height = 12;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    try {
+      ctx.drawImage(img, x, y, w, h, 0, 0, 24, 12);
+      const data = ctx.getImageData(0, 0, 24, 12).data;
+      let sum = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        sum += (0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]) / 255;
+      }
+      return sum / (data.length / 4);
+    } catch (err) {
+      return null;
     }
-    if (cabs) cabs.hidden = false;
-    if (bar) bar.hidden = solo;
-    if (back) back.hidden = solo;
+  }
+
+  function tuneNameOnBackdrop(url) {
+    if (!readerName || !stageBg || stageBg.hidden || !url) return;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = function () {
+      if (url !== backdropUrl) return;
+      const luma = lumaBehindName(img, stageBg, readerName);
+      const light = luma != null && luma >= 0.65;
+      readerName.classList.toggle("is-on-light", light);
+      readerName.classList.toggle("is-on-dark", !light);
+    };
+    img.src = url;
+  }
+
+  function paintStage(reader) {
+    if (!stageBg || !hall) return;
+    if (reader && reader.has_backdrop && reader.id) {
+      backdropUrl = api("/backdrop?person=" + encodeURIComponent(reader.id) + "&r=" + (reader.backdrop_rev || 0));
+      hall.classList.add("has-backdrop");
+      if (readerName) {
+        readerName.classList.remove("is-on-light");
+        readerName.classList.add("is-on-dark");
+      }
+      stageBg.style.backgroundImage = "url(" + backdropUrl + ")";
+      stageBg.hidden = false;
+      requestAnimationFrame(layoutStage);
+    } else {
+      backdropUrl = "";
+      hall.classList.remove("has-backdrop");
+      if (readerName) readerName.classList.remove("is-on-light", "is-on-dark");
+      stageBg.hidden = true;
+      stageBg.style.backgroundImage = "";
+    }
+  }
+
+  function paintFace(p) {
+    if (!p) return;
+    if (readerName) readerName.textContent = p.display_name || "";
+    if (faceImg) {
+      if (p.has_cover) {
+        faceImg.alt = p.display_name || "";
+        faceImg.src = api("/cover?person=" + encodeURIComponent(p.id) + "&v=" + (p.cover_rev || 0));
+        faceImg.hidden = false;
+      } else {
+        faceImg.removeAttribute("src");
+        faceImg.hidden = true;
+      }
+    }
+    if (faceEmpty) faceEmpty.hidden = true;
+    paintStage(p);
+  }
+
+  function paintIdentityRow() {
+    const row = document.querySelector('.settings-entry[data-job="identity"]');
+    if (row) row.hidden = personIds().length < 2;
   }
 
   function showHome() {
-    const only = onlyPerson();
-    if (only) {
-      showAlbum(only, names[only]);
+    const primary = primaryPersonId();
+    if (primary) {
+      showAlbum(primary, names[primary]);
       return;
     }
     openPerson = "";
     if (window.FamilyFeed) window.FamilyFeed.stop();
-    paintSoloChrome();
-    const homeWrap = document.querySelector(".local-cabs");
-    if (homeWrap) homeWrap.hidden = false;
-    if (cabs) cabs.hidden = false;
     if (album) album.hidden = true;
     if (feed) feed.innerHTML = "";
-    const board = document.getElementById("tag-board");
-    if (board) board.hidden = true;
+    if (homeHead) homeHead.hidden = true;
     showRail(false);
     showSettings(false);
   }
 
   function showAlbum(person, name) {
-    const solo = !!onlyPerson();
-    paintSoloChrome();
-    if (!solo) {
-      const homeWrap = document.querySelector(".local-cabs");
-      if (homeWrap) homeWrap.hidden = true;
-      if (cabs) cabs.hidden = true;
-    }
+    if (homeHead) homeHead.hidden = false;
+    if (cabHud) cabHud.hidden = false;
     if (album) album.hidden = false;
-    if (!solo && albumTitle) albumTitle.textContent = name || names[person] || person;
     if (window.FamilyTags) window.FamilyTags.show(person);
     if (window.FamilyFeed && window.FamilyFeed.syncTools) window.FamilyFeed.syncTools();
     else showRail(false);
     showSettings(true, person);
-    const hud = cabs && cabs.querySelector('.cab-hud[data-person="' + person + '"]');
+    paintIdentityRow();
     const p = latestPeople[person];
-    if (hud && p) fillHud(hud, p);
-    if (openPerson === person) return;
+    const same = openPerson === person;
+    if (p) {
+      if (!same) paintFace(p);
+      fillHud(cabHud, p);
+    }
+    if (same) return;
     openPerson = person;
     if (window.FamilyFeed) window.FamilyFeed.start(person);
   }
@@ -232,6 +342,8 @@
     const body = new FormData();
     body.append("cover", file, file.name || "cover.jpg");
     fail("正在換封面…");
+    const entry = document.querySelector('.settings-entry[data-job="cover"]');
+    setJobRun(entry, true);
     try {
       const res = await fetch(api("/api/cover?person=" + encodeURIComponent(person)), {
         method: "POST",
@@ -246,6 +358,39 @@
       if (statusEl && statusEl.textContent === "正在換封面…") statusEl.textContent = "";
     } catch (err) {
       fail("封面換不上，請再選一次，或確認家裡這台有開");
+    } finally {
+      setJobRun(entry, false);
+    }
+  }
+
+  function pickBackdrop(person) {
+    coverPerson = person;
+    if (backdropInput) {
+      backdropInput.value = "";
+      backdropInput.click();
+    }
+  }
+
+  async function uploadBackdrop(person, file) {
+    const body = new FormData();
+    body.append("backdrop", file, file.name || "backdrop.jpg");
+    const entry = document.querySelector('.settings-entry[data-job="backdrop"]');
+    setJobRun(entry, true);
+    try {
+      const res = await fetch(api("/api/backdrop?person=" + encodeURIComponent(person)), {
+        method: "POST",
+        body: body,
+      });
+      const data = await res.json().catch(function () {
+        return {};
+      });
+      if (!res.ok) throw new Error(data.error || "fail");
+      lastCab = "";
+      await boot();
+    } catch (err) {
+      fail("背景換不上，請再選一次，或確認家裡這台有開");
+    } finally {
+      setJobRun(entry, false);
     }
   }
 
@@ -513,13 +658,18 @@
   }
 
   function ensureSettings() {
-    if (settingsWrap && settingsWrap.isConnected) return settingsWrap;
-    settingsWrap = null;
-    const wrap = document.createElement("div");
+    if (settingsWrap && settingsWrap.isConnected) {
+      const host = cabHud && cabHud.querySelector(".cab-wrap");
+      if (host && settingsWrap.parentNode !== host) host.appendChild(settingsWrap);
+      return settingsWrap;
+    }
+    const existing = document.getElementById("album-settings");
+    const wrap = existing && existing.isConnected ? existing : document.createElement("div");
     settingsWrap = wrap;
     wrap.id = "album-settings";
     wrap.className = "album-settings";
     wrap.hidden = true;
+    wrap.innerHTML = "";
     const toggle = insButton("settings-toggle", GEAR, "設定");
     toggle.setAttribute("aria-expanded", "false");
     const menu = document.createElement("div");
@@ -562,8 +712,23 @@
       entry(CAMERA, "更換大頭照", function () {
         const pid = wrap.dataset.person || openPerson;
         if (pid) pickCover(pid);
-      })
+      }, "cover")
     );
+    menu.appendChild(
+      entry(SCENE, "更換背景", function () {
+        const pid = wrap.dataset.person || openPerson;
+        if (pid) pickBackdrop(pid);
+      }, "backdrop")
+    );
+    const idRow = entry(PERSON, "切換身分", function () {
+      const ids = personIds();
+      if (ids.length < 2) return;
+      const i = Math.max(0, ids.indexOf(openPerson));
+      const next = ids[(i + 1) % ids.length];
+      location.hash = next;
+    }, "identity");
+    idRow.hidden = true;
+    menu.appendChild(idRow);
     menu.appendChild(
       entry(TRASH, "開啟垃圾桶", function () {
         if (window.FamilyFeed) window.FamilyFeed.openTrash();
@@ -580,7 +745,9 @@
     });
     wrap.appendChild(toggle);
     wrap.appendChild(menu);
-    document.body.appendChild(wrap);
+    const host = cabHud && cabHud.querySelector(".cab-wrap");
+    if (host) host.appendChild(wrap);
+    else document.body.appendChild(wrap);
     document.addEventListener("keydown", function (ev) {
       if (ev.key === "Escape") closeSettings();
     });
@@ -598,15 +765,14 @@
   function showSettings(on, pid) {
     const wrap = ensureSettings();
     pid = pid || openPerson;
-    if (on && pid && cabs) {
-      const host = cabs.querySelector(
-        '.cab-hud[data-person="' + pid + '"] .cab-wrap'
-      );
+    if (on && pid && cabHud) {
+      const host = cabHud.querySelector(".cab-wrap");
       if (host && wrap.parentNode !== host) host.appendChild(wrap);
       wrap.dataset.person = pid;
     }
     wrap.hidden = !on;
     if (!on) closeSettings();
+    paintIdentityRow();
   }
 
   function bindCastTrash(btn) {
@@ -615,75 +781,6 @@
       ev.stopPropagation();
       if (window.FamilyFeed) window.FamilyFeed.trashSelected();
     });
-  }
-
-  function cabCard(p) {
-    const hud = document.createElement("div");
-    hud.className = "cab-hud";
-    hud.dataset.person = p.id;
-    const wrap = document.createElement("div");
-    wrap.className = "cab-wrap";
-    const a = document.createElement("div");
-    a.className = "cab" + (p.has_cover ? " has-cover" : "");
-    a.dataset.name = p.display_name;
-    a.setAttribute("role", "button");
-    a.setAttribute("aria-label", p.display_name);
-    const cover = document.createElement("div");
-    cover.className = "cab-cover";
-    const ring = document.createElement("div");
-    ring.className = "cab-ring";
-    const face = document.createElement("div");
-    face.className = "cab-face";
-    if (p.has_cover) {
-      const img = document.createElement("img");
-      img.alt = p.display_name;
-      img.decoding = "async";
-      img.draggable = false;
-      img.src = api("/cover?person=" + encodeURIComponent(p.id) + "&v=" + (p.cover_rev || 0));
-      face.appendChild(img);
-    } else {
-      const empty = document.createElement("div");
-      empty.className = "cab-empty-name";
-      empty.textContent = p.display_name;
-      face.appendChild(empty);
-    }
-    const shield = document.createElement("span");
-    shield.className = "cab-shield";
-    face.appendChild(shield);
-    cover.appendChild(ring);
-    cover.appendChild(face);
-    const liquid = document.createElement("div");
-    liquid.className = "cab-liquid";
-    liquid.hidden = true;
-    liquid.innerHTML =
-      '<span class="cab-wave cab-wave-back"></span><span class="cab-wave cab-wave-front"></span>';
-    cover.appendChild(liquid);
-    const think = document.createElement("div");
-    think.className = "thinking-five";
-    think.setAttribute("aria-hidden", "true");
-    think.hidden = true;
-    think.innerHTML = "<span></span><span></span><span></span><span></span><span></span>";
-    cover.appendChild(think);
-    a.appendChild(cover);
-    a.addEventListener("click", function () {
-      location.hash = p.id;
-    });
-    wrap.appendChild(a);
-    const cap = document.createElement("div");
-    cap.className = "cab-caption";
-    cap.hidden = true;
-    const capText = document.createElement("span");
-    capText.className = "hp-text";
-    const capAlt = document.createElement("span");
-    capAlt.className = "hp-alt";
-    capAlt.hidden = true;
-    capAlt.innerHTML = '<span class="hp-alt-pct"></span><span class="hp-alt-count"></span>';
-    cap.appendChild(capText);
-    cap.appendChild(capAlt);
-    hud.appendChild(wrap);
-    hud.appendChild(cap);
-    fillHud(hud, p);
-    return hud;
   }
 
   function hpRow(kind) {
@@ -730,7 +827,7 @@
   function setUploadView(person, view) {
     uploadViews[person] = view;
     const p = latestPeople[person];
-    const hud = cabs && cabs.querySelector('.cab-hud[data-person="' + person + '"]');
+    const hud = hudFor(person);
     if (p && hud) fillHud(hud, p);
   }
 
@@ -744,7 +841,7 @@
       if (uploadViews[person] !== view) return;
       delete uploadViews[person];
       const p = latestPeople[person];
-      const hud = cabs && cabs.querySelector('.cab-hud[data-person="' + person + '"]');
+      const hud = hudFor(person);
       if (p && hud) fillHud(hud, p);
     }, after);
   }
@@ -760,6 +857,9 @@
     if (isBooting()) return;
     const blobs = document.getElementById("blobs");
     if (blobs) blobs.hidden = true;
+    const p = latestPeople[openPerson];
+    if (p) paintStage(p);
+    else layoutStage();
   }
 
   function placeSettingsMenu(toggle, menu) {
@@ -806,6 +906,7 @@
   }
 
   function fillHud(hud, p) {
+    if (!hud || !p) return;
     const id = p.id;
     const local = uploadViews[id] || null;
     const backupRun = p.sync === "running";
@@ -932,14 +1033,6 @@
     row.classList.toggle("is-error", !!view.error);
   }
 
-  function paintHud(people) {
-    if (!cabs) return;
-    (people || []).forEach(function (p) {
-      const hud = cabs.querySelector('.cab-hud[data-person="' + p.id + '"]');
-      if (hud) fillHud(hud, p);
-    });
-  }
-
   function startBackup(person) {
     const row = latestPeople[person];
     if (backupAsk[person] || (row && row.sync === "running")) return;
@@ -947,7 +1040,7 @@
     try {
       localStorage.removeItem("family.backupDone." + person);
     } catch (e) {}
-    const hud = cabs && cabs.querySelector('.cab-hud[data-person="' + person + '"]');
+    const hud = hudFor(person);
     if (hud && row) fillHud(hud, row);
     else if (hud) {
       const cover = hud.querySelector(".cab-cover");
@@ -979,7 +1072,7 @@
         backupAsk[person] = false;
         fail("現在同步不了，請聯絡維護的那個傢伙");
         const p = latestPeople[person];
-        const next = cabs && cabs.querySelector('.cab-hud[data-person="' + person + '"]');
+        const next = hudFor(person);
         if (p && next) fillHud(next, p);
         else paintBackdrop();
       });
@@ -993,6 +1086,8 @@
           sync: p.sync,
           has_cover: p.has_cover,
           cover_rev: p.cover_rev,
+          has_backdrop: p.has_backdrop,
+          backdrop_rev: p.backdrop_rev,
           display_name: p.display_name,
         };
       })
@@ -1010,7 +1105,6 @@
           ? "請刪掉圖示，用 Safari 打開專用連結後再加入"
           : NEED_LINK
       );
-      if (cabs) cabs.innerHTML = "";
       lastCab = "";
       return;
     }
@@ -1027,15 +1121,12 @@
         latestPeople[p.id] = p;
       });
       const stamp = cardStamp(cab.people);
-      if (cabs && stamp !== lastCab) {
-        lastCab = stamp;
-        cabs.innerHTML = "";
-        (cab.people || []).forEach(function (p) {
-          cabs.appendChild(cabCard(p));
-        });
-      } else {
-        paintHud(cab.people);
+      const current = latestPeople[openPerson] || latestPeople[primaryPersonId()];
+      if (current && cabHud) {
+        if (stamp !== lastCab) paintFace(current);
+        fillHud(cabHud, current);
       }
+      lastCab = stamp;
       window._familyRunning = (cab.people || []).some(function (p) {
         return p.sync === "running";
       });
@@ -1056,16 +1147,11 @@
 
   function route() {
     const id = personFromHash();
-    const only = onlyPerson();
-    if ((!id || !names[id]) && only) {
-      showAlbum(only, names[only]);
+    if (id && names[id]) {
+      showAlbum(id, names[id] || id);
       return;
     }
-    if (!id || !names[id]) {
-      showHome();
-      return;
-    }
-    showAlbum(id, names[id] || id);
+    showHome();
   }
 
   function isRailStatus(text) {
@@ -1127,19 +1213,33 @@
       if (statusEl && isRailStatus(statusEl.textContent)) statusEl.textContent = "";
       const pid = openPerson;
       const p = pid && latestPeople[pid];
-      const hud = pid && cabs && cabs.querySelector('.cab-hud[data-person="' + pid + '"]');
+      const hud = pid && hudFor(pid);
       if (p && hud) fillHud(hud, p);
     },
     setRail: function (on) {
       showRail(!!on);
     },
+    layoutStage: layoutStage,
   };
   window.addEventListener("hashchange", route);
-  const back = document.querySelector("#album .nav-back");
-  if (back) {
-    back.addEventListener("click", function (ev) {
-      ev.preventDefault();
-      location.hash = "";
+  window.addEventListener("resize", layoutStage);
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", layoutStage);
+  if (coverInput) {
+    coverInput.addEventListener("change", function () {
+      const file = coverInput.files && coverInput.files[0];
+      const who = coverPerson || openPerson;
+      coverInput.value = "";
+      if (!file || !who) return;
+      uploadCover(who, file);
+    });
+  }
+  if (backdropInput) {
+    backdropInput.addEventListener("change", function () {
+      const file = backdropInput.files && backdropInput.files[0];
+      const who = coverPerson || openPerson;
+      backdropInput.value = "";
+      if (!file || !who) return;
+      uploadBackdrop(who, file);
     });
   }
   let polling = false;

@@ -25,7 +25,7 @@
 <link rel="icon" href="./rose-two.svg" type="image/svg+xml"/>
 <link rel="apple-touch-icon" href="./icons/rose-two-180.png"/>
 <link rel="stylesheet" href="./vendor/photoswipe/photoswipe.css"/>
-<link rel="stylesheet" href="./app.css?v=82"/>
+<link rel="stylesheet" href="./app.css?v=83"/>
 <script src="./config.js?v=1787650964"></script>
 <script>
 (function () {
@@ -129,28 +129,42 @@
       <div class="invite-wait-bar" id="invite-wait-bar"></div>
     </div>
   </div>
-  <div class="local-cabs">
-    <div class="grid" id="cabinets"></div>
-  </div>
-  <div class="tag-board" id="tag-board" hidden></div>
-  <div id="album" hidden>
-    <div class="wrap album-bar">
-      <button type="button" class="ins-icon nav-back" aria-label="返回">
-        <span class="ins-ring"></span>
-        <span class="ins-face">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5L8 12l6.5 6.5M8.5 12H20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </span>
-      </button>
-      <div class="album-head">
-        <h2 id="album-title"></h2>
+  <div class="home-head" id="home-head" hidden>
+    <div class="stage-bg" id="stage-bg" hidden></div>
+    <div class="cab-hud" id="cab-hud" hidden>
+      <div class="cab-wrap">
+        <div class="cab-cover">
+          <div class="cab-ring" aria-hidden="true"></div>
+          <div class="cab-face">
+            <img id="face-img" alt="" hidden/>
+            <div class="cab-empty-name" id="face-empty" hidden></div>
+            <span class="cab-shield" aria-hidden="true"></span>
+          </div>
+          <div class="cab-liquid" id="cab-liquid" hidden>
+            <span class="cab-wave cab-wave-back"></span>
+            <span class="cab-wave cab-wave-front"></span>
+          </div>
+          <div class="thinking-five" id="cab-think" hidden aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+        </div>
+        <div id="album-settings" class="album-settings" hidden></div>
+      </div>
+      <p class="reader-name" id="reader-name"></p>
+      <div class="cab-caption" id="cab-caption" hidden>
+        <span class="hp-text"></span>
+        <span class="hp-alt" hidden><span class="hp-alt-pct"></span><span class="hp-alt-count"></span></span>
       </div>
     </div>
+    <div class="tag-board" id="tag-board" hidden></div>
+  </div>
+  <div id="album" hidden>
     <div class="feed" id="feed"></div>
     <p class="feed-hint" id="feed-hint" hidden>讀取照片中…</p>
     <div class="feed-sentinel" id="feed-sentinel" hidden></div>
   </div>
 </div>
 <aside class="photo-rail" id="photo-rail" hidden aria-label="照片操作"></aside>
+<input id="cover-input" type="file" accept="image/*" hidden/>
+<input id="backdrop-input" type="file" accept="image/*" hidden/>
 <div class="home-install" id="home-install" hidden>
   <p>請點底部分享，再選加入主畫面</p>
   <button type="button" class="invite-go" id="home-installed">我已加入</button>
@@ -159,9 +173,9 @@
 <script src="./vendor/photoswipe/photoswipe-lightbox.umd.min.js"></script>
 <script src="./rose-two.js?v=22"></script>
 <script src="./gallery.js?v=61"></script>
-<script src="./tags.js?v=68"></script>
+<script src="./tags.js?v=69"></script>
 <script src="./gate.js?v=14"></script>
-<script src="./door.js?v=64"></script>
+<script src="./door.js?v=65"></script>
 <script>
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js?v=45");

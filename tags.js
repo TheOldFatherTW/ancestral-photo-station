@@ -676,6 +676,7 @@
       if (findSheet) return;
       paint(lastBoard);
     };
+    if (window.FamilyDoor && window.FamilyDoor.layoutStage) window.FamilyDoor.layoutStage();
   }
 
   function load() {

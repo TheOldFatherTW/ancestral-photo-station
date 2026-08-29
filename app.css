@@ -4,6 +4,9 @@
   --ink: #262626;
   --mute: #737373;
   --line: #dbdbdb;
+  --accent: #c13584;
+  --accent-press: #d62976;
+  --void: #fafafa;
   --rose: #c13584;
   --rose-soft: #e091b0;
   --sheet-find-min: min(72dvh, calc(var(--vvh, 100vh) - 12px));

@@ -315,11 +315,23 @@
     mask.addEventListener("pointercancel", function () {
       press = null;
     });
+    let lastY = 0;
+    mask.addEventListener("touchstart", function (ev) {
+      if (ev.touches && ev.touches[0]) lastY = ev.touches[0].clientY;
+    }, { passive: true });
     mask.addEventListener(
       "touchmove",
       function (ev) {
         const node = ev.target && ev.target.nodeType === 1 ? ev.target : ev.target && ev.target.parentElement;
-        if (node && node.closest && node.closest(".tag-picker-suggest, .list-tag-body")) return;
+        const scroller = node && node.closest && node.closest(".tag-picker-suggest, .list-tag-body");
+        const y = ev.touches && ev.touches[0] ? ev.touches[0].clientY : lastY;
+        const dy = y - lastY;
+        lastY = y;
+        if (scroller && scroller.scrollHeight > scroller.clientHeight + 1) {
+          const atTop = scroller.scrollTop <= 0 && dy > 0;
+          const atBot = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1 && dy < 0;
+          if (!atTop && !atBot) return;
+        }
         ev.preventDefault();
       },
       { passive: false }

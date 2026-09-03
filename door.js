@@ -1222,10 +1222,17 @@
     );
   }
 
+  function paintRailHeart(on) {
+    const rail = document.getElementById("photo-rail");
+    const heart = rail && rail.querySelector(".rail-heart");
+    if (heart) heart.classList.toggle("is-on", !!on);
+  }
+
   function showRail(on) {
     const rail = ensureRail();
     if (rail) rail.hidden = !on;
     document.documentElement.classList.toggle("has-rail", !!on);
+    if (!on) paintRailHeart(false);
   }
 
   function ensureRail() {
@@ -1282,6 +1289,9 @@
     },
     setRail: function (on) {
       showRail(!!on);
+    },
+    paintRailHeart: function (on) {
+      paintRailHeart(!!on);
     },
     layoutStage: layoutStage,
   };

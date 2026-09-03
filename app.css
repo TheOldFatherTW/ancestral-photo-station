@@ -395,6 +395,14 @@ button.apple-next path {
   stroke-linecap: round;
   paint-order: stroke fill;
 }
+.rail-heart.is-on {
+  color: #d62976;
+}
+.rail-heart.is-on .ins-face svg,
+.rail-heart.is-on .ins-face path {
+  fill: currentColor;
+  stroke: none;
+}
 .tile-shield,
 .cab-shield {
   position: absolute;

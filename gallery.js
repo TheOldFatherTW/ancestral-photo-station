@@ -323,6 +323,11 @@
     if (window.FamilyDoor && window.FamilyDoor.setRail) {
       window.FamilyDoor.setRail(toolsOn());
     }
+    if (window.FamilyDoor && window.FamilyDoor.paintRailHeart) {
+      const items = targetItems();
+      const loved = items.length > 0 && items.every(function (it) { return it.favorite; });
+      window.FamilyDoor.paintRailHeart(loved);
+    }
   }
 
   function markTile(a, on) {

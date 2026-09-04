@@ -1,1 +1,1 @@
-window.VAULT_ORIGIN = "https://query-javascript-petroleum-trivia.trycloudflare.com";
+window.VAULT_ORIGIN = "https://feel-higher-precisely-electronic.trycloudflare.com";

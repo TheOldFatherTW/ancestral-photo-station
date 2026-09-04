@@ -1,1 +1,1 @@
-window.VAULT_ORIGIN = "https://strengthening-lenders-liz-amd.trycloudflare.com";
+window.VAULT_ORIGIN = "https://query-javascript-petroleum-trivia.trycloudflare.com";

@@ -2,6 +2,9 @@
   const board = document.getElementById("tag-board");
   const RENAMEABLE = { person: 1, place_country: 1, place_city: 1, custom: 1 };
   const DELETE_ID = "media:delete";
+  const TEXT_PRE = "text:";
+  const QR_ANY = "qr:any";
+  let findScope = { tag: true, text: true, qr: true };
   const ARROW =
     '<svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="18"/><path d="M15.2 11.5L22.5 18l-7.3 6.5"/></svg>';
   const MAG =
@@ -120,16 +123,58 @@
     return out;
   }
 
+  function foldQuery(s) {
+    return String(s || "")
+      .trim()
+      .replace(/^#/, "")
+      .toLowerCase()
+      .replace(/身份/g, "身分");
+  }
+
+  function isSearchTok(id) {
+    return id === QR_ANY || String(id || "").indexOf(TEXT_PRE) === 0;
+  }
+
+  function textTok(q) {
+    return TEXT_PRE + encodeURIComponent(String(q || "").trim());
+  }
+
+  function tokenTag(id) {
+    if (id === QR_ANY) return { id: QR_ANY, label: "有QR", kind: "search" };
+    if (String(id || "").indexOf(TEXT_PRE) === 0) {
+      let q = String(id).slice(TEXT_PRE.length);
+      try {
+        q = decodeURIComponent(q);
+      } catch (e) {}
+      return { id: id, label: q, kind: "search" };
+    }
+    return tagById(id);
+  }
+
+  function scopeString() {
+    const out = [];
+    if (findScope.tag) out.push("tag");
+    if (findScope.text) out.push("text");
+    if (findScope.qr) out.push("qr");
+    return out.join(",") || "tag,text,qr";
+  }
+
+  function feedFilter(ids, extra) {
+    extra = extra || {};
+    extra.scope = scopeString();
+    if (window.FamilyFeed) window.FamilyFeed.filter(ids, extra);
+  }
+
   function catalogOf(query, opts) {
-    const q = String(query || "").trim().replace(/^#/, "").toLowerCase();
+    const q = foldQuery(query);
     if (!q) return recommendations(opts);
     return tagPool(opts)
       .filter(function (tag) {
-        return String(tag.label || "").toLowerCase().indexOf(q) >= 0;
+        return foldQuery(tag.label).indexOf(q) >= 0;
       })
       .sort(function (a, b) {
-        const al = String(a.label || "").toLowerCase();
-        const bl = String(b.label || "").toLowerCase();
+        const al = foldQuery(a.label);
+        const bl = foldQuery(b.label);
         return (
           Number(bl === q) - Number(al === q) ||
           Number(bl.indexOf(q) === 0) - Number(al.indexOf(q) === 0) ||
@@ -219,7 +264,7 @@
     else if (on) kind = " is-on";
     chip.className = "tag-chip" + kind;
     chip.dataset.tagId = tag.id;
-    chip.textContent = "#" + tag.label;
+    chip.textContent = (tag.kind === "search" ? "" : "#") + tag.label;
     chip.addEventListener("click", function (ev) {
       ev.preventDefault();
       choose(tag);
@@ -235,7 +280,7 @@
     const x = document.createElement("button");
     x.type = "button";
     x.className = "ins-x";
-    x.setAttribute("aria-label", "取消 #" + tag.label);
+    x.setAttribute("aria-label", "取消 " + (tag.kind === "search" ? tag.label : "#" + tag.label));
     x.textContent = "×";
     x.addEventListener("click", function (ev) {
       ev.preventDefault();
@@ -283,7 +328,7 @@
       modeActive = "all";
       selected.splice(0, selected.length);
     }
-    if (window.FamilyFeed) window.FamilyFeed.filter(applied.slice(), { force: true });
+    feedFilter(applied.slice(), { force: true });
   }
 
   function setBoardInert(on) {
@@ -338,6 +383,29 @@
     );
   }
 
+  function suggestChip(tag, choose) {
+    let done = false;
+    let moved = false;
+    let x = 0;
+    let y = 0;
+    function pick(ev) {
+      if (ev && ev.preventDefault) ev.preventDefault();
+      if (done || moved) return;
+      done = true;
+      choose(tag);
+    }
+    const chip = tagChip(tag, false, pick);
+    chip.addEventListener("pointerdown", function (ev) {
+      moved = false;
+      x = ev.clientX;
+      y = ev.clientY;
+    });
+    chip.addEventListener("pointermove", function (ev) {
+      if (Math.abs(ev.clientX - x) > 10 || Math.abs(ev.clientY - y) > 10) moved = true;
+    });
+    return chip;
+  }
+
   function renderSuggestions(host, query, opts, choose) {
     host.innerHTML = "";
     const hits = catalogOf(query, opts);
@@ -347,26 +415,7 @@
     title.textContent = opts && opts.kind === "person" ? "建議的人物" : "建議的標籤";
     host.appendChild(title);
     hits.forEach(function (tag) {
-      let done = false;
-      let moved = false;
-      let x = 0;
-      let y = 0;
-      function pick(ev) {
-        if (ev && ev.preventDefault) ev.preventDefault();
-        if (done || moved) return;
-        done = true;
-        choose(tag);
-      }
-      const chip = tagChip(tag, false, pick);
-      chip.addEventListener("pointerdown", function (ev) {
-        moved = false;
-        x = ev.clientX;
-        y = ev.clientY;
-      });
-      chip.addEventListener("pointermove", function (ev) {
-        if (Math.abs(ev.clientX - x) > 10 || Math.abs(ev.clientY - y) > 10) moved = true;
-      });
-      host.appendChild(chip);
+      host.appendChild(suggestChip(tag, choose));
     });
   }
 
@@ -380,7 +429,7 @@
     const form = document.createElement("form");
     form.className = "tag-picker-form";
     form.autocomplete = "off";
-    const findAsk = opts.mainAction && opts.ids && opts.ids.length ? "加標籤？" : "找標籤？";
+    const findAsk = opts.mainAction && opts.ids && opts.ids.length ? "再找？" : "找照片？";
     const input = tagInput(opts.mainAction ? findAsk : "搜尋標籤");
     const go = opts.hideGo ? null : submitArrow(opts.actionText, opts.mainAction ? "mode-pick" : "");
     const suggest = document.createElement("div");
@@ -447,20 +496,25 @@
         else showSuggest = searching;
       }
       if (showSuggest) {
-        renderSuggestions(
-          suggest,
-          input.value,
-          { exceptIds: exceptIds, hideAutoPeople: !input.value },
-          function (picked) {
-            toggle(picked, opts.keepOpen || !opts.mainAction);
-            if (opts.keepOpen || !opts.mainAction) return;
-            if (blurTimer) window.clearTimeout(blurTimer);
-            blurTimer = 0;
-            root.classList.remove("is-searching");
-            suggest.innerHTML = "";
-            input.blur();
-          }
-        );
+        const pickSuggest = function (picked) {
+          toggle(picked, opts.keepOpen || !opts.mainAction);
+          if (opts.keepOpen || !opts.mainAction) return;
+          if (blurTimer) window.clearTimeout(blurTimer);
+          blurTimer = 0;
+          root.classList.remove("is-searching");
+          suggest.innerHTML = "";
+          input.blur();
+        };
+        if (opts.customSuggest) {
+          opts.customSuggest(suggest, input.value, pickSuggest);
+        } else {
+          renderSuggestions(
+            suggest,
+            input.value,
+            { exceptIds: exceptIds, hideAutoPeople: !input.value },
+            pickSuggest
+          );
+        }
       } else {
         suggest.innerHTML = "";
       }
@@ -483,7 +537,7 @@
     input.addEventListener("focus", function () {
       if (blurTimer) window.clearTimeout(blurTimer);
       root.classList.add("is-searching");
-      if (opts.mainAction) input.placeholder = "輸入標籤文字尋找";
+      if (opts.mainAction) input.placeholder = "輸入文字尋找";
       refresh();
     });
     function finishBlur() {
@@ -494,7 +548,7 @@
         return;
       }
       root.classList.remove("is-searching");
-      if (opts.mainAction) input.placeholder = opts.ids && opts.ids.length ? "加標籤？" : "找標籤？";
+      if (opts.mainAction) input.placeholder = opts.ids && opts.ids.length ? "再找？" : "找照片？";
       refresh();
     }
     input.addEventListener("blur", function () {
@@ -506,13 +560,18 @@
       ev.preventDefault();
       const label = String(input.value || "").trim().replace(/^#/, "");
       const exact = catalogOf(label, {}).filter(function (tag) {
-        return String(tag.label || "").toLowerCase() === label.toLowerCase();
+        return foldQuery(tag.label) === foldQuery(label);
       })[0];
-      if (exact && ids().indexOf(exact.id) < 0) ids().push(exact.id);
+      if (opts.takeQuery && label) {
+        const tok = textTok(label);
+        if (ids().indexOf(tok) < 0) ids().push(tok);
+      } else if (exact && ids().indexOf(exact.id) < 0) {
+        ids().push(exact.id);
+      }
       refresh();
       if (opts.mainAction && go && go.disabled) return;
       const choices = ids()
-        .map(tagById)
+        .map(tokenTag)
         .filter(Boolean);
       const fresh = opts.allowNew && label && !exact ? label : "";
       if (opts.mainAction) {
@@ -551,7 +610,7 @@
       backToAll();
       return;
     }
-    if (window.FamilyFeed) window.FamilyFeed.filter(selected.slice());
+    feedFilter(selected.slice());
     finding = false;
     if (board) board.classList.toggle("is-finding", false);
     updateModeButtons();
@@ -562,7 +621,7 @@
     host.innerHTML = "";
     host.hidden = !selected.length;
     selected.forEach(function (id) {
-      const tag = tagById(id);
+      const tag = tokenTag(id);
       if (!tag) return;
       host.appendChild(
         removableTagChip(
@@ -590,8 +649,14 @@
     const face = document.createElement("span");
     face.className = "tag-apply-face";
     const label = document.createElement("span");
-    label.textContent =
-      selected.length > 1 ? "尋找這些標籤的照片" : "尋找有此標籤的照片";
+    const onlyTags = selected.every(function (id) {
+      return !isSearchTok(id);
+    });
+    label.textContent = onlyTags
+      ? selected.length > 1
+        ? "尋找這些標籤的照片"
+        : "尋找有此標籤的照片"
+      : "尋找這些照片";
     face.appendChild(label);
     face.insertAdjacentHTML("beforeend", CHEV);
     btn.appendChild(face);
@@ -616,7 +681,8 @@
     mode = "all";
     modeActive = "all";
     selected.splice(0, selected.length);
-    if (window.FamilyFeed) window.FamilyFeed.filter([]);
+    findScope = { tag: true, text: true, qr: true };
+    feedFilter([]);
     paint(lastBoard);
   }
 
@@ -626,7 +692,7 @@
     btn.dataset.mode = id;
     btn.className = "mode-btn" + (id === "find" ? " mode-find" : "");
     if (id === "find") {
-      btn.innerHTML = MAG + "<span>" + (selected.length ? "加標籤？" : "找標籤？") + "</span>";
+      btn.innerHTML = MAG + "<span>" + (selected.length ? "再找？" : "找照片？") + "</span>";
       if (finding) btn.classList.add("is-on");
     } else {
       btn.textContent = label;
@@ -672,10 +738,10 @@
     if (!board) return;
     lastBoard = data || lastBoard;
     selected = selected.filter(function (id) {
-      return !!tagById(id);
+      return isSearchTok(id) || !!tagById(id);
     });
     const keptApplied = applied.filter(function (id) {
-      return !!tagById(id);
+      return isSearchTok(id) || !!tagById(id);
     });
     if (tagKey(keptApplied) !== tagKey(applied)) {
       applied = keptApplied;
@@ -688,7 +754,7 @@
     bar.appendChild(modeBtn("fav", "最愛"));
     bar.appendChild(modeBtn("all", "全部"));
     bar.appendChild(modeBtn("list", "列表"));
-    bar.appendChild(modeBtn("find", selected.length ? "加標籤？" : "找標籤？"));
+    bar.appendChild(modeBtn("find", selected.length ? "再找？" : "找照片？"));
     board.appendChild(bar);
     board.classList.toggle("is-finding", finding);
     board.classList.toggle("is-dirty", isDirty());
@@ -865,7 +931,7 @@
     const head = document.createElement("div");
     head.className = "batch-tag-head";
     const title = document.createElement("p");
-    title.textContent = selected.length ? "加標籤？" : "找標籤？";
+    title.textContent = selected.length ? "再找？" : "找照片？";
     const close = document.createElement("button");
     close.type = "button";
     close.className = "batch-tag-close";
@@ -878,13 +944,79 @@
     });
     head.appendChild(title);
     head.appendChild(close);
+    const scopes = document.createElement("div");
+    scopes.className = "tag-row find-scope";
+    function paintFindScope() {
+      scopes.innerHTML = "";
+      [
+        ["tag", "標籤"],
+        ["text", "文字"],
+        ["qr", "QR"],
+      ].forEach(function (pair) {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "tag-chip" + (findScope[pair[0]] ? " is-picked" : "");
+        chip.textContent = pair[1];
+        chip.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          findScope[pair[0]] = !findScope[pair[0]];
+          paintFindScope();
+          if (findRefresh) findRefresh();
+        });
+        scopes.appendChild(chip);
+      });
+    }
+    function findSuggest(host, query, choose) {
+      host.innerHTML = "";
+      const q = String(query || "").trim().replace(/^#/, "");
+      const exceptIds = {};
+      selected.forEach(function (id) {
+        exceptIds[id] = true;
+      });
+      if (findScope.tag) {
+        const hits = catalogOf(query, { exceptIds: exceptIds, hideAutoPeople: !q });
+        if (hits.length) {
+          const cap = document.createElement("p");
+          cap.className = "tag-suggest-title";
+          cap.textContent = "標籤";
+          host.appendChild(cap);
+          hits.forEach(function (tag) {
+            host.appendChild(suggestChip(tag, choose));
+          });
+        }
+      }
+      if (!q && findScope.qr && selected.indexOf(QR_ANY) < 0) {
+        const cap = document.createElement("p");
+        cap.className = "tag-suggest-title";
+        cap.textContent = "QR";
+        host.appendChild(cap);
+        host.appendChild(
+          suggestChip({ id: QR_ANY, label: "有QR", kind: "search" }, choose)
+        );
+      }
+      if (q && (findScope.text || findScope.qr || findScope.tag)) {
+        const tok = textTok(q);
+        if (selected.indexOf(tok) < 0) {
+          const cap = document.createElement("p");
+          cap.className = "tag-suggest-title";
+          cap.textContent = findScope.text ? "文字" : findScope.qr ? "QR" : "標籤";
+          host.appendChild(cap);
+          host.appendChild(
+            suggestChip({ id: tok, label: q, kind: "search" }, choose)
+          );
+        }
+      }
+    }
+    paintFindScope();
     const picker = createPicker({
       ids: selected,
-      actionText: selected.length > 1 ? "尋找這些標籤的照片" : "尋找有此標籤的照片",
+      actionText: "尋找這些照片",
       mainAction: true,
       hideGo: true,
       hideChosen: true,
       alwaysSuggest: true,
+      takeQuery: true,
+      customSuggest: findSuggest,
       appliedIds: function () {
         return applied;
       },
@@ -902,6 +1034,7 @@
     });
     findRefresh = picker.refresh;
     card.appendChild(head);
+    card.appendChild(scopes);
     card.appendChild(picker.node);
     mask.appendChild(card);
     lockSheetPage(mask, function () {
@@ -1887,6 +2020,7 @@
       mode = "all";
       modeActive = "all";
       finding = false;
+      findScope = { tag: true, text: true, qr: true };
       selected = [];
       applied = [];
       load();

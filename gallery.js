@@ -20,6 +20,9 @@
   let afterThumbs = function () {};
   let currentPerson = "";
   let currentTags = [];
+  let currentScope = "";
+  const TEXT_PRE = "text:";
+  const QR_ANY = "qr:any";
   let beforeTrashTags = [];
   let trashMode = false;
   let favMode = false;
@@ -116,8 +119,62 @@
     );
   }
 
-  function snapId(person, tagIds, trash, fav) {
-    return person + "|" + (trash ? "1" : "0") + "|" + (fav ? "f" : "0") + "|" + tagKey(tagIds);
+  function isTextTok(id) {
+    return String(id || "").indexOf(TEXT_PRE) === 0;
+  }
+
+  function textFromTok(id) {
+    if (!isTextTok(id)) return "";
+    try {
+      return decodeURIComponent(String(id).slice(TEXT_PRE.length));
+    } catch (e) {
+      return String(id).slice(TEXT_PRE.length);
+    }
+  }
+
+  function splitTokens(ids) {
+    const tags = [];
+    let q = "";
+    let hasQr = false;
+    (ids || []).forEach(function (id) {
+      if (id === QR_ANY) hasQr = true;
+      else if (isTextTok(id)) q = textFromTok(id);
+      else if (id) tags.push(id);
+    });
+    return { tags: tags, q: q, hasQr: hasQr };
+  }
+
+  function snapId(person, tagIds, trash, fav, scope) {
+    return (
+      person +
+      "|" +
+      (trash ? "1" : "0") +
+      "|" +
+      (fav ? "f" : "0") +
+      "|" +
+      tagKey(tagIds) +
+      "|" +
+      (scope || "")
+    );
+  }
+
+  function photosPath(person, offset, limit, trash, fav) {
+    const feed = document.getElementById("feed");
+    let path =
+      "/api/photos?person=" +
+      encodeURIComponent(person) +
+      "&offset=" +
+      offset +
+      "&limit=" +
+      limit;
+    const tags = ((feed && feed.dataset.tags) || "").split(",").filter(Boolean);
+    if (tags.length) path += "&tags=" + tags.map(encodeURIComponent).join(",");
+    if (feed && feed.dataset.q) path += "&q=" + encodeURIComponent(feed.dataset.q);
+    if (feed && feed.dataset.qr === "1") path += "&qr=1";
+    if (feed && feed.dataset.scope) path += "&scope=" + encodeURIComponent(feed.dataset.scope);
+    if (trash) path += "&trash=1";
+    if (fav) path += "&fav=1";
+    return path;
   }
 
   function readSnap(id) {
@@ -1088,7 +1145,13 @@
       dropBlobs();
       feed.innerHTML = "";
       feed.dataset.person = person;
-      feed.dataset.tags = tagIds.join(",");
+      const parts = splitTokens(tagIds);
+      if (opts && opts.scope != null) currentScope = opts.scope || "";
+      else if (!parts.q && !parts.hasQr) currentScope = "";
+      feed.dataset.tags = parts.tags.join(",");
+      feed.dataset.q = parts.q || "";
+      feed.dataset.qr = parts.hasQr ? "1" : "";
+      feed.dataset.scope = currentScope;
       currentPerson = person;
       currentTags = tagIds;
       trashMode = !!(opts && opts.trash);
@@ -1116,7 +1179,7 @@
         bar.appendChild(back);
         feed.appendChild(bar);
       }
-      const viewId = snapId(person, tagIds, trashMode, favMode);
+      const viewId = snapId(person, tagIds, trashMode, favMode, currentScope);
       if (pins.length) {
         delete feedSnaps[viewId];
         try {
@@ -1265,7 +1328,9 @@
           ? "垃圾桶是空的。"
           : favMode
             ? "還沒有最愛。"
-            : "這個櫃子還沒有照片。";
+            : feed.dataset.q || feed.dataset.qr || (feed.dataset.tags || "").length
+              ? "沒有照片。"
+              : "這個櫃子還沒有照片。";
         if (!trashMode) feed.innerHTML = "";
         feed.appendChild(empty);
       }
@@ -1285,16 +1350,7 @@
         if (my !== run) return;
         headBusy = true;
         try {
-          const tags = (feed.dataset.tags || "").split(",").filter(Boolean);
-          let path =
-            "/api/photos?person=" +
-            encodeURIComponent(person) +
-            "&offset=0&limit=" +
-            FIRST;
-          if (tags.length) path += "&tags=" + tags.map(encodeURIComponent).join(",");
-          if (trashMode) path += "&trash=1";
-          if (favMode) path += "&fav=1";
-          const res = await fetch(api(path));
+          const res = await fetch(api(photosPath(person, 0, FIRST, trashMode, favMode)));
           const data = await res.json();
           if (my !== run) return;
           total = data.total;
@@ -1321,20 +1377,9 @@
         loading = true;
         showHint();
         try {
-          const tags = (feed.dataset.tags || "")
-            .split(",")
-            .filter(Boolean);
-          let path =
-            "/api/photos?person=" +
-            encodeURIComponent(person) +
-            "&offset=" +
-            offset +
-            "&limit=" +
-            (offset ? LIMIT : FIRST);
-          if (tags.length) path += "&tags=" + tags.map(encodeURIComponent).join(",");
-          if (trashMode) path += "&trash=1";
-          if (favMode) path += "&fav=1";
-          const url = api(path);
+          const url = api(
+            photosPath(person, offset, offset ? LIMIT : FIRST, trashMode, favMode)
+          );
           const res = await fetch(url);
           const data = await res.json();
           if (my !== run) return;
@@ -1399,27 +1444,33 @@
       if (!person || trashMode) return;
       const force = !!(opts && opts.force);
       const fav = !!(opts && opts.fav);
+      const scope = opts && opts.scope != null ? opts.scope : currentScope;
       if (
         !force &&
         person === currentPerson &&
         tagKey(next) === tagKey(currentTags) &&
-        fav === favMode
+        fav === favMode &&
+        scope === currentScope
       ) {
         return;
       }
       if (force) {
-        const viewId = snapId(person, next, trashMode, fav);
+        const viewId = snapId(person, next, trashMode, fav, scope);
         delete feedSnaps[viewId];
         try {
           localStorage.removeItem(FEED_STORE + viewId);
         } catch (e) {}
       }
-      window.FamilyFeed.start(person, next, { fav: fav });
+      window.FamilyFeed.start(person, next, { fav: fav, scope: scope });
     },
     refresh: function () {
       if (!currentPerson) return;
       if (lightbox && lightbox.pswp) lightbox.pswp.close();
-      window.FamilyFeed.start(currentPerson, currentTags, { trash: trashMode, fav: favMode });
+      window.FamilyFeed.start(currentPerson, currentTags, {
+        trash: trashMode,
+        fav: favMode,
+        scope: currentScope,
+      });
     },
     prepareAction: function () {
       return prepareAction();

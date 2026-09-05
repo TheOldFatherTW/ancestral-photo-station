@@ -944,28 +944,6 @@
     });
     head.appendChild(title);
     head.appendChild(close);
-    const scopes = document.createElement("div");
-    scopes.className = "tag-row find-scope";
-    function paintFindScope() {
-      scopes.innerHTML = "";
-      [
-        ["tag", "標籤"],
-        ["text", "文字"],
-        ["qr", "QR"],
-      ].forEach(function (pair) {
-        const chip = document.createElement("button");
-        chip.type = "button";
-        chip.className = "tag-chip" + (findScope[pair[0]] ? " is-picked" : "");
-        chip.textContent = pair[1];
-        chip.addEventListener("click", function (ev) {
-          ev.preventDefault();
-          findScope[pair[0]] = !findScope[pair[0]];
-          paintFindScope();
-          if (findRefresh) findRefresh();
-        });
-        scopes.appendChild(chip);
-      });
-    }
     function findSuggest(host, query, choose) {
       host.innerHTML = "";
       const q = String(query || "").trim().replace(/^#/, "");
@@ -1007,7 +985,6 @@
         }
       }
     }
-    paintFindScope();
     const picker = createPicker({
       ids: selected,
       actionText: "尋找這些照片",
@@ -1034,7 +1011,6 @@
     });
     findRefresh = picker.refresh;
     card.appendChild(head);
-    card.appendChild(scopes);
     card.appendChild(picker.node);
     mask.appendChild(card);
     lockSheetPage(mask, function () {
@@ -1049,6 +1025,59 @@
       box.scrollTop = 1;
       box.scrollTop = 0;
     }
+    setBoardInert(true);
+    document.documentElement.classList.add("tag-modal-open");
+  }
+
+  function addScopeSwitch(host, key, label) {
+    const lab = document.createElement("label");
+    lab.className = "ask-skip";
+    const name = document.createElement("span");
+    name.textContent = label;
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.setAttribute("role", "switch");
+    input.checked = !!findScope[key];
+    const sw = document.createElement("span");
+    sw.className = "ask-sw";
+    lab.appendChild(name);
+    lab.appendChild(input);
+    lab.appendChild(sw);
+    input.addEventListener("change", function () {
+      findScope[key] = !!input.checked;
+      if (findRefresh) findRefresh();
+    });
+    host.appendChild(lab);
+  }
+
+  function openSearchSettings() {
+    closeFind({ repaint: false });
+    closeList();
+    closeBatch();
+    const mask = document.createElement("div");
+    mask.className = "batch-tag-mask";
+    const card = document.createElement("div");
+    card.className = "batch-tag-sheet";
+    const head = document.createElement("div");
+    head.className = "batch-tag-head";
+    const title = document.createElement("p");
+    title.textContent = "搜尋設定";
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "batch-tag-close";
+    close.setAttribute("aria-label", "關閉");
+    close.textContent = "×";
+    close.addEventListener("click", closeBatch);
+    head.appendChild(title);
+    head.appendChild(close);
+    card.appendChild(head);
+    addScopeSwitch(card, "tag", "標籤");
+    addScopeSwitch(card, "text", "文字");
+    addScopeSwitch(card, "qr", "QR");
+    mask.appendChild(card);
+    lockSheetPage(mask, closeBatch);
+    document.body.appendChild(mask);
+    batchSheet = mask;
     setBoardInert(true);
     document.documentElement.classList.add("tag-modal-open");
   }
@@ -2020,7 +2049,6 @@
       mode = "all";
       modeActive = "all";
       finding = false;
-      findScope = { tag: true, text: true, qr: true };
       selected = [];
       applied = [];
       load();
@@ -2035,6 +2063,7 @@
     beforePhotoChange: beforePhotoChange,
     refreshPhoto: refreshPhoto,
     openBatch: openBatch,
+    openSearchSettings: openSearchSettings,
     setApplied: function (ids) {
       applied = (ids || []).slice();
       selected.splice.apply(selected, [0, selected.length].concat(applied));

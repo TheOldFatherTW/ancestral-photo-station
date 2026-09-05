@@ -1999,9 +1999,13 @@ button.batch-tag-close::before {
 .list-tag-sheet .batch-tag-head {
   flex: 0 0 auto;
 }
-.list-tag-sheet .find-scope {
-  flex: 0 0 auto;
-  margin: 0 0 10px;
+.batch-tag-sheet .ask-skip {
+  margin: 0;
+  padding: 4px 0;
+  min-height: 44px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
 }
 @media (min-width: 600px) {
   .batch-tag-mask {

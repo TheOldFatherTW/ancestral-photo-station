@@ -1768,6 +1768,8 @@ button.tag-chip {
   color: rgba(255, 255, 255, 0.72);
 }
 .pswp-tag-sheet.is-searching .pswp-tag-card {
+  display: flex;
+  flex-direction: column;
   width: min(520px, calc(100% - 24px));
   max-height: calc(100% - 16px);
   margin: 8px 12px;
@@ -1778,6 +1780,15 @@ button.tag-chip {
   color: var(--ink);
   box-shadow: 0 16px 44px rgba(0, 0, 0, 0.26);
   -webkit-overflow-scrolling: touch;
+}
+.pswp-tag-sheet.is-searching .pswp-tag-suggest {
+  order: 2;
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+.pswp-tag-sheet.is-searching .pswp-tag-add {
+  order: 3;
+  flex: 0 0 auto;
 }
 .pswp-tag-sheet.is-searching .pswp-tag-title,
 .pswp-tag-sheet.is-searching .tag-suggest-title {

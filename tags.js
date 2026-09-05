@@ -1214,6 +1214,16 @@
       return catalogOf(q, { exceptIds: onPhoto, hideAutoPeople: !q });
     }
 
+    let searchArm = 0;
+    let searchArmTimer = 0;
+
+    function clearSearchArm() {
+      if (searchArmTimer) {
+        window.clearTimeout(searchArmTimer);
+        searchArmTimer = 0;
+      }
+    }
+
     function renderSuggest() {
       if (!node.classList.contains("is-searching")) {
         suggest.innerHTML = "";
@@ -1231,6 +1241,7 @@
             }
           : { exceptIds: onPhoto, hideAutoPeople: !input.value },
         function (hit) {
+          if (Date.now() < searchArm) return;
           const target = renameTarget();
           if (target) {
             askMerge(target, hit);
@@ -1263,22 +1274,46 @@
         tag.kind === "person" && tag.auto && /^p\d+$/i.test(String(tag.label || ""))
           ? ""
           : tag.label;
-      renderSuggest();
       if (document.activeElement === input && input.value) input.select();
     }
 
-    function enterSearch() {
-      node.classList.add("is-searching");
+    function revealSearch(fromType) {
+      clearSearchArm();
+      if (fromType) searchArm = 0;
+      if (!input.isConnected) return;
       const target = renameTarget();
       if (target && !renaming) enterRename(target);
+      node.classList.add("is-searching");
       title.textContent = target && target.kind === "person" ? "這是誰?" : "建議的標籤";
       renderSuggest();
       photoAsk();
     }
 
+    function enterSearch() {
+      if (node.classList.contains("is-searching")) {
+        revealSearch();
+        return;
+      }
+      const target = renameTarget();
+      if (target && !renaming) enterRename(target);
+      photoAsk();
+      // Same tap that focuses the field also used to paint the white card and
+      // name chips under the finger. iOS then hid the keyboard and treated the
+      // leftover click as "change to that name". Keep the field still until
+      // this gesture is finished.
+      searchArm = Date.now() + 480;
+      clearSearchArm();
+      searchArmTimer = window.setTimeout(function () {
+        searchArmTimer = 0;
+        if (document.activeElement !== input) return;
+        revealSearch();
+      }, 400);
+    }
+
     function leaveSearch() {
       window.setTimeout(function () {
         if (node.contains(document.activeElement)) return;
+        clearSearchArm();
         node.classList.remove("is-searching");
         title.textContent = sheetItem && sheetItem.kind === "video" ? "這支的標記" : "這張的標記";
         suggest.innerHTML = "";
@@ -1379,7 +1414,13 @@
     });
     input.addEventListener("focus", enterSearch);
     input.addEventListener("blur", leaveSearch);
-    input.addEventListener("input", renderSuggest);
+    input.addEventListener("input", function () {
+      if (!node.classList.contains("is-searching")) {
+        revealSearch(true);
+        return;
+      }
+      renderSuggest();
+    });
     input.addEventListener("keydown", function (ev) {
       if (ev.key === "Escape" && renaming) {
         ev.preventDefault();

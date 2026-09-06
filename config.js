@@ -1,1 +1,1 @@
-window.VAULT_ORIGIN = "https://feel-higher-precisely-electronic.trycloudflare.com";
+window.VAULT_ORIGIN = "https://led-theta-synthetic-targets.trycloudflare.com";

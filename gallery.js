@@ -28,6 +28,7 @@
   let beforeTrashTags = [];
   let trashMode = false;
   let favMode = false;
+  let videoMode = false;
   let folderWall = false;
   let folderId = "";
   let fromClass = false;
@@ -150,13 +151,15 @@
     return { tags: tags, q: q, hasQr: hasQr };
   }
 
-  function snapId(person, tagIds, trash, fav, scope) {
+  function snapId(person, tagIds, trash, fav, scope, video) {
     return (
       person +
       "|" +
       (trash ? "1" : "0") +
       "|" +
       (fav ? "f" : "0") +
+      "|" +
+      (video ? "v" : "0") +
       "|" +
       tagKey(tagIds) +
       "|" +
@@ -180,6 +183,7 @@
     if (feed && feed.dataset.scope) path += "&scope=" + encodeURIComponent(feed.dataset.scope);
     if (trash) path += "&trash=1";
     if (fav) path += "&fav=1";
+    if (feed && feed.dataset.video === "1") path += "&video=1";
     return path;
   }
 
@@ -346,6 +350,8 @@
   function itemKey(item) {
     if (item.kind === "folder") return "folder:" + item.id;
     if (item.kind === "fav") return "folder:fav";
+    if (item.kind === "videos") return "folder:videos";
+    if (item.kind === "qr") return "folder:qr";
     if (item.kind === "add") return "folder:add";
     return item.person + "|" + item.bucket + "|" + item.rel;
   }
@@ -415,7 +421,7 @@
 
   function enterSelect(item, tile) {
     if (trashMode) return;
-    if (item && (item.kind === "fav" || item.kind === "add")) return;
+    if (item && (item.kind === "fav" || item.kind === "videos" || item.kind === "qr" || item.kind === "add")) return;
     selecting = true;
     if (item) {
       const key = itemKey(item);
@@ -692,6 +698,14 @@
         }
         return;
       }
+      if (item.kind === "videos") {
+        window.FamilyFeed.start(currentPerson, [], { video: true, fromClass: true });
+        return;
+      }
+      if (item.kind === "qr") {
+        window.FamilyFeed.start(currentPerson, [QR_ANY], { fromClass: true });
+        return;
+      }
       window.FamilyFeed.start(currentPerson, [], { fav: true, fromClass: true });
     });
   }
@@ -737,7 +751,14 @@
     }
     const ep = document.createElement("span");
     ep.className = "tile-ep";
-    ep.textContent = item.kind === "fav" ? "最愛" : folderTitleText(item.title || "");
+    ep.textContent =
+      item.kind === "fav"
+        ? "最愛"
+        : item.kind === "videos"
+          ? "影片"
+          : item.kind === "qr"
+            ? "QR code"
+            : folderTitleText(item.title || "");
     a.appendChild(ep);
     a.appendChild(shield);
     if (item.kind === "folder") markTile(a, selecting && picked[a.dataset.key]);
@@ -756,6 +777,7 @@
     fromClass = true;
     trashMode = false;
     favMode = false;
+    videoMode = false;
     currentPerson = person;
     currentTags = [];
     currentScope = "";
@@ -766,6 +788,7 @@
     feed.dataset.q = "";
     feed.dataset.qr = "";
     feed.dataset.fav = "";
+    feed.dataset.video = "";
     feed.dataset.trash = "";
     feed.classList.remove("is-trash");
     if (window.thumbObserver) {
@@ -791,6 +814,14 @@
         nextFolderTitle = payload.next_title || "新資料夾1";
         feed.innerHTML = "";
         feed.appendChild(folderTile({ kind: "fav", id: "fav", cover: payload.fav_cover || null }));
+        feed.appendChild(
+          folderTile({ kind: "videos", id: "videos", cover: payload.video_cover || null })
+        );
+        if (payload.has_qr) {
+          feed.appendChild(
+            folderTile({ kind: "qr", id: "qr", cover: payload.qr_cover || null })
+          );
+        }
         (payload.folders || []).forEach(function (row) {
           feed.appendChild(
             folderTile({
@@ -1400,21 +1431,22 @@
       currentTags = tagIds;
       trashMode = !!(opts && opts.trash);
       favMode = !!(opts && opts.fav) && !trashMode;
+      videoMode = !!(opts && opts.video) && !trashMode && !favMode;
       document.documentElement.classList.toggle("trash-open", trashMode);
       feed.dataset.trash = trashMode ? "1" : "";
       feed.dataset.fav = favMode ? "1" : "";
+      feed.dataset.video = videoMode ? "1" : "";
       feed.classList.toggle("is-trash", trashMode);
       if (
         !trashMode &&
-        !(opts && opts.fav) &&
-        !(opts && opts.folderId) &&
+        !(opts && (opts.fav || opts.video || opts.folderId || opts.fromClass)) &&
         window.FamilyTags &&
         window.FamilyTags.setApplied
       ) {
         window.FamilyTags.setApplied(tagIds);
       }
       if (!opts || !opts.keepSelect) clearSelect();
-      if (trashMode || (fromClass && (favMode || folderId))) {
+      if (trashMode || fromClass) {
         const bar = document.createElement("div");
         bar.className = "trash-bar";
         const back = document.createElement("button");
@@ -1430,7 +1462,7 @@
         bar.appendChild(back);
         feed.appendChild(bar);
       }
-      const viewId = snapId(person, tagIds, trashMode, favMode, currentScope);
+      const viewId = snapId(person, tagIds, trashMode, favMode, currentScope, videoMode);
       if (pins.length) {
         delete feedSnaps[viewId];
         try {
@@ -1579,7 +1611,7 @@
           ? "垃圾桶是空的。"
           : favMode
             ? "還沒有最愛。"
-            : folderId
+            : fromClass
               ? "這個資料夾還沒有照片。"
               : feed.dataset.q || feed.dataset.qr || (feed.dataset.tags || "").length
                 ? "沒有照片。"
@@ -1715,7 +1747,7 @@
         return;
       }
       if (force) {
-        const viewId = snapId(person, next, trashMode, fav, scope);
+        const viewId = snapId(person, next, trashMode, fav, scope, false);
         delete feedSnaps[viewId];
         try {
           localStorage.removeItem(FEED_STORE + viewId);
@@ -1729,7 +1761,10 @@
       window.FamilyFeed.start(currentPerson, currentTags, {
         trash: trashMode,
         fav: favMode,
+        video: videoMode,
         scope: currentScope,
+        fromClass: fromClass,
+        folderId: folderId,
       });
     },
     prepareAction: function () {
@@ -1981,6 +2016,8 @@
       afterThumbs = function () {};
       currentPerson = "";
       trashMode = false;
+      favMode = false;
+      videoMode = false;
       folderWall = false;
       folderId = "";
       fromClass = false;

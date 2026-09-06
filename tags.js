@@ -1098,7 +1098,7 @@
     const mask = document.createElement("div");
     mask.className = "batch-tag-mask";
     const card = document.createElement("div");
-    card.className = "batch-tag-sheet";
+    card.className = "batch-tag-sheet is-folder";
     const head = document.createElement("div");
     head.className = "batch-tag-head";
     const title = document.createElement("p");
@@ -1146,6 +1146,30 @@
         go.disabled = !ids.length;
       },
       onSubmit: function () {},
+    });
+    function setFolderCardMode(mode) {
+      card.classList.toggle("is-folder-name", mode === "name");
+      card.classList.toggle("is-folder-tags", mode === "tags");
+    }
+    function leaveFolderField(keep) {
+      window.setTimeout(function () {
+        const active = document.activeElement;
+        if (active === keep) return;
+        if (active === name || active === picker.input) return;
+        setFolderCardMode("");
+      }, 180);
+    }
+    name.addEventListener("focus", function () {
+      setFolderCardMode("name");
+    });
+    name.addEventListener("blur", function () {
+      leaveFolderField(name);
+    });
+    picker.input.addEventListener("focus", function () {
+      setFolderCardMode("tags");
+    });
+    picker.input.addEventListener("blur", function () {
+      leaveFolderField(picker.input);
     });
     const face = document.createElement("span");
     face.className = "tag-apply-face";

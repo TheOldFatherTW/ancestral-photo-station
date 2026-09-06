@@ -696,6 +696,13 @@
     });
   }
 
+  function folderTitleText(title) {
+    const max = window.matchMedia("(max-width: 560px)").matches ? 5 : 15;
+    const s = String(title || "");
+    if (s.length <= max) return s;
+    return s.slice(0, max) + "...";
+  }
+
   function folderTile(item) {
     const a = document.createElement("div");
     a.className = "tile";
@@ -714,20 +721,6 @@
       bindFolderTile(a, item);
       return a;
     }
-    if (item.kind === "fav") {
-      a.classList.add("is-fav-folder");
-      const heart = document.createElement("span");
-      heart.className = "tile-heart";
-      heart.innerHTML = HEART;
-      a.appendChild(heart);
-      const ep = document.createElement("span");
-      ep.className = "tile-ep";
-      ep.textContent = "最愛";
-      a.appendChild(ep);
-      a.appendChild(shield);
-      bindFolderTile(a, item);
-      return a;
-    }
     if (item.cover && item.cover.rel) {
       const img = document.createElement("img");
       img.decoding = "async";
@@ -736,12 +729,18 @@
       watchThumb(img, item.cover, "tile", true);
       a.appendChild(img);
     }
+    if (item.kind === "fav") {
+      const heart = document.createElement("span");
+      heart.className = "tile-heart";
+      heart.innerHTML = HEART;
+      a.appendChild(heart);
+    }
     const ep = document.createElement("span");
     ep.className = "tile-ep";
-    ep.textContent = item.title || "";
+    ep.textContent = item.kind === "fav" ? "最愛" : folderTitleText(item.title || "");
     a.appendChild(ep);
     a.appendChild(shield);
-    markTile(a, selecting && picked[a.dataset.key]);
+    if (item.kind === "folder") markTile(a, selecting && picked[a.dataset.key]);
     bindFolderTile(a, item);
     return a;
   }
@@ -791,7 +790,7 @@
         if (my !== run || !folderWall) return;
         nextFolderTitle = payload.next_title || "新資料夾1";
         feed.innerHTML = "";
-        feed.appendChild(folderTile({ kind: "fav", id: "fav" }));
+        feed.appendChild(folderTile({ kind: "fav", id: "fav", cover: payload.fav_cover || null }));
         (payload.folders || []).forEach(function (row) {
           feed.appendChild(
             folderTile({

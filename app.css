@@ -1372,18 +1372,19 @@ button.tag-apply::before {
 .batch-tag-sheet > .tag-picker-form {
   margin: 0 0 12px;
 }
-.batch-tag-sheet.is-folder.is-folder-tags > .tag-picker-form {
+.batch-tag-sheet.is-folder.is-folder-name > .folder-find-ask {
   display: none !important;
 }
-.batch-tag-sheet.is-folder.is-folder-name .tag-picker .tag-picker-form,
-.batch-tag-sheet.is-folder.is-folder-name .tag-picker-suggest {
-  display: none !important;
+.folder-find-ask .tag-search-input {
+  text-align: left;
+  color: var(--mute);
+  font-weight: 400;
 }
 .tag-picker {
   margin: 0 0 14px;
 }
 .tag-picker.no-search .tag-picker-form {
-  justify-content: flex-end;
+  display: none;
 }
 .tag-picker.no-search .tag-picker-suggest {
   display: none;
@@ -1976,36 +1977,6 @@ button.tag-chip {
 }
 .kb-up .batch-tag-sheet {
   max-height: calc(100% - 16px);
-}
-@media (max-width: 560px) {
-  .kb-up .batch-tag-sheet.is-folder.is-folder-tags {
-    display: flex;
-    flex-direction: column;
-    max-height: calc(100% - 16px);
-  }
-  .kb-up .batch-tag-sheet.is-folder.is-folder-tags .tag-picker {
-    flex: 1 1 auto;
-    min-height: 0;
-    margin: 0 0 10px;
-    display: flex;
-    flex-direction: column;
-  }
-  .kb-up .batch-tag-sheet.is-folder.is-folder-tags .tag-picker-card {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-  }
-  .kb-up .batch-tag-sheet.is-folder.is-folder-tags .tag-picker-suggest {
-    flex: 1 1 auto;
-    min-height: 120px;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-  }
-  .kb-up .batch-tag-sheet.is-folder.is-folder-tags .tag-apply {
-    margin-top: auto;
-  }
 }
 .batch-tag-head {
   display: flex;

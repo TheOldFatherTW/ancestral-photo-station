@@ -1086,9 +1086,66 @@
   }
 
   function closeBatch() {
+    if (findSheet && batchSheet) {
+      findSheet.remove();
+      findSheet = null;
+      finding = false;
+    }
     if (batchSheet) batchSheet.remove();
     batchSheet = null;
     unlockBoard();
+  }
+
+  function openFolderFind(ids, onPicked) {
+    if (findSheet) {
+      findSheet.remove();
+      findSheet = null;
+    }
+    const mask = document.createElement("div");
+    mask.className = "batch-tag-mask list-tag-mask";
+    const card = document.createElement("div");
+    card.className = "batch-tag-sheet list-tag-sheet";
+    const head = document.createElement("div");
+    head.className = "batch-tag-head";
+    const title = document.createElement("p");
+    title.textContent = ids.length ? "再找？" : "搜尋標籤";
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "batch-tag-close";
+    close.setAttribute("aria-label", "關閉");
+    close.textContent = "×";
+    function shut() {
+      closeFind({ repaint: false });
+    }
+    close.addEventListener("click", shut);
+    head.appendChild(title);
+    head.appendChild(close);
+    const picker = createPicker({
+      ids: ids,
+      hideGo: true,
+      hideChosen: true,
+      alwaysSuggest: true,
+      allowNew: false,
+      onChange: function () {
+        closeFind({ repaint: false });
+        if (onPicked) onPicked();
+      },
+      onSubmit: function () {},
+    });
+    findRefresh = picker.refresh;
+    card.appendChild(head);
+    card.appendChild(picker.node);
+    mask.appendChild(card);
+    lockSheetPage(mask, shut);
+    document.body.appendChild(mask);
+    findSheet = mask;
+    const box = mask.querySelector(".tag-picker-suggest");
+    if (box) {
+      box.scrollTop = 1;
+      box.scrollTop = 0;
+    }
+    setBoardInert(true);
+    document.documentElement.classList.add("tag-modal-open");
   }
 
   function openFolderCard(folder) {
@@ -1140,36 +1197,34 @@
     const picker = createPicker({
       ids: ids,
       hideGo: true,
+      hideInput: true,
       allowNew: false,
-      keepOpen: true,
       onChange: function () {
         go.disabled = !ids.length;
       },
       onSubmit: function () {},
     });
-    function setFolderCardMode(mode) {
-      card.classList.toggle("is-folder-name", mode === "name");
-      card.classList.toggle("is-folder-tags", mode === "tags");
-    }
-    function leaveFolderField(keep) {
-      window.setTimeout(function () {
-        const active = document.activeElement;
-        if (active === keep) return;
-        if (active === name || active === picker.input) return;
-        setFolderCardMode("");
-      }, 180);
-    }
+    const ask = document.createElement("button");
+    ask.type = "button";
+    ask.className = "tag-search-input";
+    ask.textContent = "搜尋標籤";
+    const askRow = document.createElement("div");
+    askRow.className = "tag-picker-form folder-find-ask";
+    askRow.appendChild(ask);
+    ask.addEventListener("click", function () {
+      openFolderFind(ids, function () {
+        picker.refresh();
+        go.disabled = !ids.length;
+      });
+    });
     name.addEventListener("focus", function () {
-      setFolderCardMode("name");
+      card.classList.add("is-folder-name");
     });
     name.addEventListener("blur", function () {
-      leaveFolderField(name);
-    });
-    picker.input.addEventListener("focus", function () {
-      setFolderCardMode("tags");
-    });
-    picker.input.addEventListener("blur", function () {
-      leaveFolderField(picker.input);
+      window.setTimeout(function () {
+        if (document.activeElement === name) return;
+        card.classList.remove("is-folder-name");
+      }, 180);
     });
     const face = document.createElement("span");
     face.className = "tag-apply-face";
@@ -1200,6 +1255,7 @@
     card.appendChild(head);
     card.appendChild(nameRow);
     card.appendChild(picker.node);
+    card.appendChild(askRow);
     card.appendChild(go);
     mask.appendChild(card);
     lockSheetPage(mask, closeBatch);

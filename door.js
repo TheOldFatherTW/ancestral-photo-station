@@ -1253,6 +1253,17 @@
     hash.addEventListener("click", function (ev) {
       ev.preventDefault();
       ev.stopPropagation();
+      if (window.FamilyFeed && window.FamilyFeed.isFolderWall && window.FamilyFeed.isFolderWall()) {
+        const one = window.FamilyFeed.selectedFolder && window.FamilyFeed.selectedFolder();
+        if (!one) {
+          window.FamilyFeed.prepareAction();
+          return;
+        }
+        if (window.FamilyTags && window.FamilyTags.openFolderCard) {
+          window.FamilyTags.openFolderCard(one);
+        }
+        return;
+      }
       if (!window.FamilyFeed || !window.FamilyFeed.prepareAction()) return;
       if (window.FamilyTags && window.FamilyTags.openBatch) {
         window.FamilyTags.openBatch();
@@ -1266,9 +1277,19 @@
       ev.stopPropagation();
       if (window.FamilyFeed) window.FamilyFeed.downloadSelected();
     });
+    const cover = insButton("rail-cover", CAMERA, "設為封面");
+    cover.hidden = true;
+    cover.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (window.FamilyFeed && window.FamilyFeed.setFolderCover) {
+        window.FamilyFeed.setFolderCover();
+      }
+    });
     rail.appendChild(hash);
     rail.appendChild(trash);
     rail.appendChild(down);
+    rail.appendChild(cover);
     const heart = insButton("rail-heart", HEART, "愛心");
     heart.addEventListener("click", function (ev) {
       ev.preventDefault();
@@ -1277,6 +1298,26 @@
     });
     rail.appendChild(heart);
     return rail;
+  }
+
+  function paintRailMode() {
+    const rail = ensureRail();
+    if (!rail) return;
+    const wall = window.FamilyFeed && window.FamilyFeed.isFolderWall && window.FamilyFeed.isFolderWall();
+    const inFolder = !!(window.FamilyFeed && window.FamilyFeed.folderId && window.FamilyFeed.folderId());
+    const one = wall && window.FamilyFeed.selectedFolder && window.FamilyFeed.selectedFolder();
+    const hash = rail.querySelector(".rail-hash");
+    const down = rail.querySelector(".rail-down");
+    const heart = rail.querySelector(".rail-heart");
+    const cover = rail.querySelector(".rail-cover");
+    if (hash) {
+      hash.hidden = !!(wall && !one);
+      hash.setAttribute("aria-label", wall ? "編輯資料夾" : "新增標記");
+      hash.title = wall ? "編輯資料夾" : "新增標記";
+    }
+    if (down) down.hidden = !!wall;
+    if (heart) heart.hidden = !!wall;
+    if (cover) cover.hidden = !inFolder || !!wall;
   }
 
   window.FamilyDoor = {
@@ -1298,7 +1339,9 @@
     },
     setRail: function (on) {
       showRail(!!on);
+      paintRailMode();
     },
+    paintRailMode: paintRailMode,
     paintRailHeart: function (on) {
       paintRailHeart(!!on);
     },

@@ -348,6 +348,45 @@ button.apple-next path {
   -webkit-touch-callout: none !important;
   -webkit-user-drag: none;
 }
+.tile.tile-add {
+  background: #f7f7f7;
+  color: var(--mute);
+  box-shadow: none;
+  border: 2px dashed #c8c8c8;
+}
+.tile .tile-plus {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  pointer-events: none;
+}
+.tile .tile-plus svg {
+  width: 36px;
+  height: 36px;
+  color: #8e8e8e;
+}
+.tile.is-fav-folder {
+  background: #000;
+}
+.tile-ep {
+  position: absolute;
+  z-index: 2;
+  left: 6px;
+  bottom: 6px;
+  min-width: 1.35em;
+  padding: 3px 7px;
+  background: #000;
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  white-space: nowrap;
+}
 .tile:link,
 .tile:visited,
 .tile:hover,
@@ -1329,6 +1368,9 @@ button.tag-apply::before {
   height: 18px;
   display: block;
   stroke: #fff;
+}
+.batch-tag-sheet > .tag-picker-form {
+  margin: 0 0 12px;
 }
 .tag-picker {
   margin: 0 0 14px;

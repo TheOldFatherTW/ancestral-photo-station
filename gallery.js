@@ -10,6 +10,8 @@
   const SKIP_TRASH_KEY = "family.skipTrashAsk";
   const HEART =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20C10.5 18.4 7.3 15.8 5.4 11.9C4 9.1 5.2 6 8.4 6c1.8 0 3 1.1 3.6 2.2C12.6 7.1 13.8 6 15.6 6c3.2 0 4.4 3.1 3 5.9C16.7 15.8 13.5 18.4 12 20Z"/></svg>';
+  const PLUS =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
   let run = 0;
   let lightbox;
   let thumbActive = 0;
@@ -26,6 +28,10 @@
   let beforeTrashTags = [];
   let trashMode = false;
   let favMode = false;
+  let folderWall = false;
+  let folderId = "";
+  let fromClass = false;
+  let nextFolderTitle = "新資料夾1";
   let selecting = false;
   let viewing = false;
   let picked = {};
@@ -338,6 +344,9 @@
   }
 
   function itemKey(item) {
+    if (item.kind === "folder") return "folder:" + item.id;
+    if (item.kind === "fav") return "folder:fav";
+    if (item.kind === "add") return "folder:add";
     return item.person + "|" + item.bucket + "|" + item.rel;
   }
 
@@ -385,6 +394,9 @@
       const loved = items.length > 0 && items.every(function (it) { return it.favorite; });
       window.FamilyDoor.paintRailHeart(loved);
     }
+    if (window.FamilyDoor && window.FamilyDoor.paintRailMode) {
+      window.FamilyDoor.paintRailMode();
+    }
   }
 
   function markTile(a, on) {
@@ -403,6 +415,7 @@
 
   function enterSelect(item, tile) {
     if (trashMode) return;
+    if (item && (item.kind === "fav" || item.kind === "add")) return;
     selecting = true;
     if (item) {
       const key = itemKey(item);
@@ -472,7 +485,9 @@
       return false;
     }
     selecting = true;
-    tellSelect("請點選照片，可一張或多張，再按一次");
+    tellSelect(
+      folderWall ? "請點選資料夾，可一個或多個，再按一次" : "請點選照片，可一張或多張，再按一次"
+    );
     return false;
   }
 
@@ -576,6 +591,228 @@
       });
       document.body.appendChild(mask);
     });
+  }
+
+  function askFolderDrop() {
+    return new Promise(function (resolve) {
+      const mask = document.createElement("div");
+      mask.className = "ask-mask";
+      mask.innerHTML =
+        '<div class="ask-card" role="dialog" aria-modal="true">' +
+        "<p>將資料夾丟掉?</p>" +
+        '<div class="ask-actions"><button type="button" class="ask-no">取消</button><button type="button" class="ask-yes">丟掉</button></div>' +
+        "</div>";
+      function finish(ok) {
+        mask.remove();
+        resolve(ok);
+      }
+      mask.querySelector(".ask-no").addEventListener("click", function () {
+        finish(false);
+      });
+      mask.querySelector(".ask-yes").addEventListener("click", function () {
+        finish(true);
+      });
+      mask.addEventListener("click", function (ev) {
+        if (ev.target === mask) finish(false);
+      });
+      document.body.appendChild(mask);
+    });
+  }
+
+  function folderPost(body) {
+    return fetch(api("/api/folders"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(Object.assign({ person: currentPerson }, body)),
+    }).then(function (res) {
+      if (!res.ok) throw new Error("bad");
+      return res.json();
+    });
+  }
+
+  function bindFolderTile(a, item) {
+    if (item.kind === "folder") {
+      let press = 0;
+      let sx = 0;
+      let sy = 0;
+      let fromHold = false;
+      function clearPress() {
+        if (press) {
+          window.clearTimeout(press);
+          press = 0;
+        }
+      }
+      a.addEventListener("pointerdown", function (ev) {
+        if (ev.button && ev.button !== 0) return;
+        sx = ev.clientX;
+        sy = ev.clientY;
+        fromHold = false;
+        clearPress();
+        press = window.setTimeout(function () {
+          press = 0;
+          fromHold = true;
+          if (selecting) toggleSelect(item, a);
+          else enterSelect(item, a);
+        }, 400);
+      });
+      a.addEventListener("pointermove", function (ev) {
+        if (!press) return;
+        if (Math.abs(ev.clientX - sx) > 14 || Math.abs(ev.clientY - sy) > 14) clearPress();
+      });
+      a.addEventListener("pointerup", clearPress);
+      a.addEventListener("pointercancel", clearPress);
+      ["contextmenu", "selectstart", "dragstart"].forEach(function (name) {
+        a.addEventListener(name, function (ev) {
+          ev.preventDefault();
+        });
+      });
+      a.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        if (fromHold) {
+          fromHold = false;
+          return;
+        }
+        if (selecting) {
+          toggleSelect(item, a);
+          return;
+        }
+        window.FamilyFeed.start(currentPerson, item.tag_ids || [], {
+          folderId: item.id,
+          fromClass: true,
+        });
+      });
+      return;
+    }
+    a.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      if (selecting) return;
+      if (item.kind === "add") {
+        if (window.FamilyTags && window.FamilyTags.openFolderCard) {
+          window.FamilyTags.openFolderCard(null);
+        }
+        return;
+      }
+      window.FamilyFeed.start(currentPerson, [], { fav: true, fromClass: true });
+    });
+  }
+
+  function folderTile(item) {
+    const a = document.createElement("div");
+    a.className = "tile";
+    a.setAttribute("role", "button");
+    a.tabIndex = 0;
+    a.dataset.key = itemKey(item);
+    const shield = document.createElement("span");
+    shield.className = "tile-shield";
+    if (item.kind === "add") {
+      a.classList.add("tile-add");
+      const mark = document.createElement("span");
+      mark.className = "tile-plus";
+      mark.innerHTML = PLUS;
+      a.appendChild(mark);
+      a.appendChild(shield);
+      bindFolderTile(a, item);
+      return a;
+    }
+    if (item.kind === "fav") {
+      a.classList.add("is-fav-folder");
+      const heart = document.createElement("span");
+      heart.className = "tile-heart";
+      heart.innerHTML = HEART;
+      a.appendChild(heart);
+      const ep = document.createElement("span");
+      ep.className = "tile-ep";
+      ep.textContent = "最愛";
+      a.appendChild(ep);
+      a.appendChild(shield);
+      bindFolderTile(a, item);
+      return a;
+    }
+    if (item.cover && item.cover.rel) {
+      const img = document.createElement("img");
+      img.decoding = "async";
+      img.alt = "";
+      img.draggable = false;
+      watchThumb(img, item.cover, "tile", true);
+      a.appendChild(img);
+    }
+    const ep = document.createElement("span");
+    ep.className = "tile-ep";
+    ep.textContent = item.title || "";
+    a.appendChild(ep);
+    a.appendChild(shield);
+    markTile(a, selecting && picked[a.dataset.key]);
+    bindFolderTile(a, item);
+    return a;
+  }
+
+  function startFolderWall(person) {
+    const feed = document.getElementById("feed");
+    const sentinel = document.getElementById("feed-sentinel");
+    const hint = document.getElementById("feed-hint");
+    if (!feed || !person) return;
+    const my = ++run;
+    folderWall = true;
+    folderId = "";
+    fromClass = true;
+    trashMode = false;
+    favMode = false;
+    currentPerson = person;
+    currentTags = [];
+    currentScope = "";
+    document.documentElement.classList.remove("trash-open");
+    feed.dataset.person = person;
+    feed.dataset.folders = "1";
+    feed.dataset.tags = "";
+    feed.dataset.q = "";
+    feed.dataset.qr = "";
+    feed.dataset.fav = "";
+    feed.dataset.trash = "";
+    feed.classList.remove("is-trash");
+    if (window.thumbObserver) {
+      window.thumbObserver.disconnect();
+      window.thumbObserver = null;
+    }
+    thumbWait.length = 0;
+    dropBlobs();
+    clearSelect();
+    feed.innerHTML = "";
+    if (sentinel) sentinel.hidden = true;
+    if (hint) hint.hidden = true;
+    afterThumbs = function () {};
+    paintHint = function () {};
+    tellSelect();
+    fetch(api("/api/folders?person=" + encodeURIComponent(person)))
+      .then(function (res) {
+        if (!res.ok) throw new Error("bad");
+        return res.json();
+      })
+      .then(function (payload) {
+        if (my !== run || !folderWall) return;
+        nextFolderTitle = payload.next_title || "新資料夾1";
+        feed.innerHTML = "";
+        feed.appendChild(folderTile({ kind: "fav", id: "fav" }));
+        (payload.folders || []).forEach(function (row) {
+          feed.appendChild(
+            folderTile({
+              kind: "folder",
+              id: row.id,
+              title: row.title,
+              tag_ids: row.tag_ids || [],
+              cover: row.cover || null,
+            })
+          );
+        });
+        feed.appendChild(folderTile({ kind: "add", id: "add" }));
+      })
+      .catch(function () {
+        if (my !== run) return;
+        feed.innerHTML = "";
+        const empty = document.createElement("p");
+        empty.className = "feed-empty";
+        empty.textContent = "分類還沒讀到，請再試一次。";
+        feed.appendChild(empty);
+      });
   }
 
   function downloadName(item, mime) {
@@ -1127,6 +1364,14 @@
       const sentinel = document.getElementById("feed-sentinel");
       const hint = document.getElementById("feed-hint");
       if (!feed || !person) return;
+      if (opts && opts.folders) {
+        startFolderWall(person);
+        return;
+      }
+      folderWall = false;
+      folderId = (opts && opts.folderId) || "";
+      fromClass = !!(opts && (opts.fromClass || opts.folderId));
+      feed.dataset.folders = "";
       tagIds = normalizedTags(tagIds);
       const pins = (opts && opts.pin) || [];
       const my = ++run;
@@ -1160,21 +1405,28 @@
       feed.dataset.trash = trashMode ? "1" : "";
       feed.dataset.fav = favMode ? "1" : "";
       feed.classList.toggle("is-trash", trashMode);
-      if (!trashMode && !(opts && opts.fav) && window.FamilyTags && window.FamilyTags.setApplied) {
+      if (
+        !trashMode &&
+        !(opts && opts.fav) &&
+        !(opts && opts.folderId) &&
+        window.FamilyTags &&
+        window.FamilyTags.setApplied
+      ) {
         window.FamilyTags.setApplied(tagIds);
       }
       if (!opts || !opts.keepSelect) clearSelect();
-      if (trashMode) {
+      if (trashMode || (fromClass && (favMode || folderId))) {
         const bar = document.createElement("div");
         bar.className = "trash-bar";
         const back = document.createElement("button");
         back.type = "button";
         back.className = "ins-icon nav-back";
-        back.setAttribute("aria-label", "返回相簿");
+        back.setAttribute("aria-label", trashMode ? "返回相簿" : "返回分類");
         back.innerHTML =
           '<span class="ins-ring"></span><span class="ins-face"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5L8 12l6.5 6.5M8.5 12H20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
         back.addEventListener("click", function () {
-          window.FamilyFeed.closeTrash();
+          if (trashMode) window.FamilyFeed.closeTrash();
+          else window.FamilyFeed.closeFolder();
         });
         bar.appendChild(back);
         feed.appendChild(bar);
@@ -1328,9 +1580,11 @@
           ? "垃圾桶是空的。"
           : favMode
             ? "還沒有最愛。"
-            : feed.dataset.q || feed.dataset.qr || (feed.dataset.tags || "").length
-              ? "沒有照片。"
-              : "這個櫃子還沒有照片。";
+            : folderId
+              ? "這個資料夾還沒有照片。"
+              : feed.dataset.q || feed.dataset.qr || (feed.dataset.tags || "").length
+                ? "沒有照片。"
+                : "這個櫃子還沒有照片。";
         if (!trashMode) feed.innerHTML = "";
         feed.appendChild(empty);
       }
@@ -1445,6 +1699,13 @@
       const force = !!(opts && opts.force);
       const fav = !!(opts && opts.fav);
       const scope = opts && opts.scope != null ? opts.scope : currentScope;
+      if (folderWall || folderId || fromClass) {
+        folderWall = false;
+        folderId = "";
+        fromClass = false;
+        window.FamilyFeed.start(person, next, { fav: fav, scope: scope });
+        return;
+      }
       if (
         !force &&
         person === currentPerson &&
@@ -1477,6 +1738,31 @@
     },
     trashSelected: function () {
       if (trashMode) return Promise.resolve();
+      if (folderWall) {
+        const folders = targetItems().filter(function (it) {
+          return it.kind === "folder";
+        });
+        if (!folders.length) {
+          prepareAction();
+          return Promise.resolve();
+        }
+        return askFolderDrop().then(function (ok) {
+          if (!ok) return;
+          const ids = folders.map(function (it) {
+            return it.id;
+          });
+          window.FamilyBusy.start(ids.length > 1 ? "正在丟掉資料夾…" : "正在丟掉…");
+          return folderPost({ op: "delete", ids: ids }).then(
+            function () {
+              window.FamilyBusy.done(ids.length > 1 ? "已丟掉 " + ids.length + " 個資料夾" : "已丟掉");
+              startFolderWall(currentPerson);
+            },
+            function () {
+              window.FamilyBusy.done("丟不掉，請再試一次");
+            }
+          );
+        });
+      }
       const rows = targetRows();
       if (!rows.length) {
         prepareAction();
@@ -1628,6 +1914,62 @@
       beforeTrashTags = [];
       window.FamilyFeed.start(currentPerson, tags);
     },
+    showFolders: function (person) {
+      startFolderWall(person || currentPerson);
+    },
+    closeFolder: function () {
+      if (!currentPerson) return;
+      startFolderWall(currentPerson);
+    },
+    isFolderWall: function () {
+      return folderWall;
+    },
+    folderId: function () {
+      return folderId;
+    },
+    selectedFolder: function () {
+      const rows = targetItems().filter(function (it) {
+        return it.kind === "folder";
+      });
+      return rows.length === 1 ? rows[0] : null;
+    },
+    nextFolderTitle: function () {
+      return nextFolderTitle;
+    },
+    saveFolder: function (data) {
+      const op = data && data.id ? "update" : "create";
+      return folderPost({
+        op: op,
+        id: data && data.id,
+        title: (data && data.title) || "",
+        tag_ids: (data && data.tag_ids) || [],
+      }).then(function () {
+        startFolderWall(currentPerson);
+      });
+    },
+    setFolderCover: function () {
+      if (!folderId || folderWall || trashMode) return Promise.resolve();
+      const items = targetItems().filter(function (it) {
+        return it && it.rel;
+      });
+      if (!items.length) {
+        prepareAction();
+        return Promise.resolve();
+      }
+      const item = items[0];
+      return folderPost({
+        op: "cover",
+        id: folderId,
+        photos: [{ person: item.person, bucket: item.bucket, rel: item.rel }],
+      }).then(
+        function () {
+          clearSelect();
+        },
+        function () {
+          window.FamilyBusy.done("封面沒換上，請再試一次");
+        }
+      );
+    },
     pswp: function () {
       return lightbox && lightbox.pswp;
     },
@@ -1640,6 +1982,9 @@
       afterThumbs = function () {};
       currentPerson = "";
       trashMode = false;
+      folderWall = false;
+      folderId = "";
+      fromClass = false;
       document.documentElement.classList.remove("trash-open");
       beforeTrashTags = [];
       clearSelect();

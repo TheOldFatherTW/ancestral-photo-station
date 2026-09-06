@@ -569,6 +569,7 @@
         ids().push(exact.id);
       }
       refresh();
+      if (opts.onChange) opts.onChange(ids().slice());
       if (opts.mainAction && go && go.disabled) return;
       const choices = ids()
         .map(tokenTag)
@@ -699,15 +700,17 @@
       if (modeActive === id) btn.classList.add("is-on");
     }
     btn.addEventListener("click", function () {
-      if (id === "fav") {
+      if (id === "folders") {
         closeFind({ repaint: false });
         closeList();
-        modeActive = "fav";
+        modeActive = "folders";
         mode = "all";
         selected.splice(0, selected.length);
         applied = [];
-        const person = (document.getElementById("feed") || {}).dataset.person;
-        if (person && window.FamilyFeed) window.FamilyFeed.start(person, [], { fav: true });
+        const who = person || (document.getElementById("feed") || {}).dataset.person;
+        if (who && window.FamilyFeed && window.FamilyFeed.showFolders) {
+          window.FamilyFeed.showFolders(who);
+        }
         paint(lastBoard);
         return;
       }
@@ -751,7 +754,7 @@
     board.innerHTML = "";
     const bar = document.createElement("div");
     bar.className = "mode-bar";
-    bar.appendChild(modeBtn("fav", "最愛"));
+    bar.appendChild(modeBtn("folders", "分類"));
     bar.appendChild(modeBtn("all", "全部"));
     bar.appendChild(modeBtn("list", "列表"));
     bar.appendChild(modeBtn("find", selected.length ? "再找？" : "找照片？"));
@@ -1086,6 +1089,100 @@
     if (batchSheet) batchSheet.remove();
     batchSheet = null;
     unlockBoard();
+  }
+
+  function openFolderCard(folder) {
+    closeFind({ repaint: false });
+    closeList();
+    closeBatch();
+    const mask = document.createElement("div");
+    mask.className = "batch-tag-mask";
+    const card = document.createElement("div");
+    card.className = "batch-tag-sheet";
+    const head = document.createElement("div");
+    head.className = "batch-tag-head";
+    const title = document.createElement("p");
+    title.textContent = folder && folder.title ? folder.title : "新資料夾";
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "batch-tag-close";
+    close.setAttribute("aria-label", "關閉");
+    close.textContent = "×";
+    close.addEventListener("click", closeBatch);
+    head.appendChild(title);
+    head.appendChild(close);
+    const name = tagInput(
+      (window.FamilyFeed && window.FamilyFeed.nextFolderTitle && window.FamilyFeed.nextFolderTitle()) ||
+        "新資料夾1"
+    );
+    name.placeholder =
+      (window.FamilyFeed && window.FamilyFeed.nextFolderTitle && window.FamilyFeed.nextFolderTitle()) ||
+      "新資料夾1";
+    if (folder && folder.title && !/^新資料夾\d+$/.test(folder.title)) {
+      name.value = folder.title;
+    } else if (folder && folder.title) {
+      name.value = folder.title;
+    }
+    name.setAttribute("enterkeyhint", "done");
+    const nameRow = document.createElement("form");
+    nameRow.className = "tag-picker-form";
+    nameRow.autocomplete = "off";
+    nameRow.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      name.blur();
+    });
+    nameRow.appendChild(name);
+    const ids = ((folder && folder.tag_ids) || []).slice();
+    const go = document.createElement("button");
+    go.type = "button";
+    go.className = "tag-apply";
+    go.disabled = !ids.length;
+    const picker = createPicker({
+      ids: ids,
+      hideGo: true,
+      allowNew: false,
+      keepOpen: true,
+      onChange: function () {
+        go.disabled = !ids.length;
+      },
+      onSubmit: function () {},
+    });
+    const face = document.createElement("span");
+    face.className = "tag-apply-face";
+    const label = document.createElement("span");
+    label.textContent = "確認";
+    face.appendChild(label);
+    go.appendChild(face);
+    let busy = false;
+    go.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      if (busy || !ids.length || !window.FamilyFeed || !window.FamilyFeed.saveFolder) return;
+      busy = true;
+      go.disabled = true;
+      window.FamilyFeed.saveFolder({
+        id: folder && folder.id,
+        title: String(name.value || "").trim(),
+        tag_ids: ids.slice(),
+      }).then(
+        function () {
+          closeBatch();
+        },
+        function () {
+          busy = false;
+          go.disabled = !ids.length;
+        }
+      );
+    });
+    card.appendChild(head);
+    card.appendChild(nameRow);
+    card.appendChild(picker.node);
+    card.appendChild(go);
+    mask.appendChild(card);
+    lockSheetPage(mask, closeBatch);
+    document.body.appendChild(mask);
+    batchSheet = mask;
+    setBoardInert(true);
+    document.documentElement.classList.add("tag-modal-open");
   }
 
   function openBatch() {
@@ -2063,6 +2160,7 @@
     beforePhotoChange: beforePhotoChange,
     refreshPhoto: refreshPhoto,
     openBatch: openBatch,
+    openFolderCard: openFolderCard,
     openSearchSettings: openSearchSettings,
     setApplied: function (ids) {
       applied = (ids || []).slice();

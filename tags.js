@@ -1233,11 +1233,14 @@
     face.appendChild(label);
     go.appendChild(face);
     let busy = false;
-    go.addEventListener("click", function (ev) {
-      ev.preventDefault();
-      if (busy || !ids.length || !window.FamilyFeed || !window.FamilyFeed.saveFolder) return;
+    function submitFolder(ev) {
+      if (ev && ev.preventDefault) ev.preventDefault();
+      if (busy || go.disabled || !ids.length || !window.FamilyFeed || !window.FamilyFeed.saveFolder) {
+        return;
+      }
       busy = true;
       go.disabled = true;
+      if (name.blur) name.blur();
       window.FamilyFeed.saveFolder({
         id: folder && folder.id,
         title: String(name.value || "").trim(),
@@ -1251,7 +1254,13 @@
           go.disabled = !ids.length;
         }
       );
+    }
+    go.addEventListener("pointerdown", function (ev) {
+      if (ev.button && ev.button !== 0) return;
+      ev.preventDefault();
+      submitFolder(ev);
     });
+    go.addEventListener("click", submitFolder);
     card.appendChild(head);
     card.appendChild(nameRow);
     card.appendChild(picker.node);

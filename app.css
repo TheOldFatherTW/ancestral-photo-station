@@ -1372,8 +1372,21 @@ button.tag-apply::before {
 .batch-tag-sheet > .tag-picker-form {
   margin: 0 0 12px;
 }
+.batch-tag-sheet.is-folder {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 .batch-tag-sheet.is-folder.is-folder-name > .folder-find-ask {
   display: none !important;
+}
+.batch-tag-sheet.is-folder > .tag-apply {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+  touch-action: manipulation;
+}
+.batch-tag-sheet.is-folder > .tag-apply:disabled {
+  opacity: 0.45;
 }
 .folder-find-ask .tag-search-input {
   text-align: left;

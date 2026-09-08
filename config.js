@@ -1,1 +1,1 @@
-window.VAULT_ORIGIN = "https://led-theta-synthetic-targets.trycloudflare.com";
+window.VAULT_ORIGIN = "https://intervention-installed-ideal-gene.trycloudflare.com";

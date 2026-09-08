@@ -1443,7 +1443,7 @@ form.tag-picker-form {
   outline: 2px solid rgba(214, 41, 118, 0.16);
   outline-offset: 1px;
 }
-.tag-picker-form button[type="submit"]:not(.tag-submit) {
+.tag-picker-form button[type="submit"]:not(.tag-submit):not(.tag-apply) {
   flex: 0 0 auto;
   width: auto;
   min-width: 66px;
@@ -2233,7 +2233,14 @@ button.batch-tag-close::before {
   display: flex;
   gap: 8px;
 }
-.ask-actions button {
+.ask-actions:has(> .tag-apply:not([hidden])) {
+  flex-direction: column;
+}
+.ask-actions:has(> .tag-apply:not([hidden])) button:not(.tag-apply) {
+  flex: 0 0 44px;
+  width: 100%;
+}
+.ask-actions button:not(.tag-apply) {
   flex: 1;
   height: 44px;
   border: 0;
@@ -2248,6 +2255,14 @@ button.batch-tag-close::before {
 .ask-yes {
   background: linear-gradient(120deg, #fa7e1e 0%, #d62976 48%, #962fbf 100%);
   color: #fff;
+}
+.ask-actions .tag-apply {
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  height: 52px;
+  border-radius: 999px;
 }
 @keyframes work-spin {
   to {

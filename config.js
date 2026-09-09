@@ -1,1 +1,1 @@
-window.VAULT_ORIGIN = "https://intervention-installed-ideal-gene.trycloudflare.com";
+window.VAULT_ORIGIN = "https://works-lightbox-instruction-plays.trycloudflare.com";

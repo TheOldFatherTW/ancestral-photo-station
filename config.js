@@ -1,1 +1,1 @@
-window.VAULT_ORIGIN = "https://insurance-legends-noticed-discovery.trycloudflare.com";
+window.VAULT_ORIGIN = "https://wildlife-spending-quit-saying.trycloudflare.com";

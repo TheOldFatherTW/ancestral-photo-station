@@ -1,1 +1,1 @@
-window.VAULT_ORIGIN = "https://works-lightbox-instruction-plays.trycloudflare.com";
+window.VAULT_ORIGIN = "https://saving-solomon-discovered-evans.trycloudflare.com";

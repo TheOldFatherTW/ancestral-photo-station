@@ -1,1 +1,1 @@
-window.VAULT_ORIGIN = "https://acm-utils-sig-preston.trycloudflare.com";
+window.VAULT_ORIGIN = "https://sorted-mill-classroom-radio.trycloudflare.com";

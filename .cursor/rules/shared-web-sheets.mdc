@@ -1,0 +1,46 @@
+---
+description: 共用門面殼與 UI 詞彙；能共用的物件 100% 共用，不把 Famiphoto 產品邏輯當共用核心。
+alwaysApply: true
+---
+
+# 共用 web 殼（shared web sheets）
+
+本 repo 是 **Famiphoto／祖傳照片備份站** 的 GitHub Pages 門面。能共用的 UI 物件、等待語言、返回／確認／卡片詞彙，必須與 Fami 家族其他門面 **100% 共用**，不得各做第三種卡或私製按鈕。
+
+## 必讀 skill
+
+- **`fami-shared-ui`**：返回、確認、找卡／操作卡、齒輪、等待三種語言、入口頁／個人頁骨架的詞彙表。活標本：`E:\FamilyPhotos\web`（本專案）、`D:\Mybook\web`。
+- **`ios-home-web`**：Pages → 家裡保險庫（`config.js` 的 `VAULT_ORIGIN`）→ 硬碟資料；iPhone／iPad／桌機三套表面。
+
+## 能共用的物件 100% 共用
+
+- 改一顆共用件＝同一回合改所有掛上的專案（至少 `E:\FamilyPhotos\web` 與 `D:\Mybook\web`；famibook／kodohon／gamepal 等兄弟門面也要對齊）。
+- 預設交付 **標準版個人頁**（首頁頭、格子封面、標籤「最愛」、長押多選＋愛心、齒輪每列有圖示）。禁止未經詢問做閹割版。
+- 改樣式須定義新名字（返回2、確認2…）寫進 skill，不得偷偷改原件。
+- 本 repo 另有 `.cursor/rules`：`wait-ui`、`ios-keyboard`、`surfaces`、`always-push-github`——與本規則並存，不要刪改。
+
+## 共用 chrome vs 產品外掛
+
+| 共用 chrome（要跟 fami-shared-ui 對齊） | 本專案產品外掛（勿當共用核心整包複製） |
+|---|---|
+| Rose Two 等待、thinking-five、粉紅進度條 | **FamiphotoGate**：邀請連結、`hey.html` 入口流程 |
+| 返回／確認／找卡／操作卡／齒輪菜單 | **Apple 帳密／MFA 驗證**（`gate.js` 內 invite 面板） |
+| 首頁頭、`.blobs` 入口色塊、白底個人頁 | 相簿／上傳／備份／家人格子（`door.js`、`gallery.js`） |
+| `visualViewport`／`--kb` 鍵盤（`gate.js` 與 `tags.js` 各一套） | `family.viewKey`、隧道 `k=` 鑰匙產品邏輯 |
+
+- **`gate.js` 整檔不是共用 kernel**。其中 invite／Apple MFA 是 Famiphoto 產品層，疊在共用等待畫面與入口殼之上。
+- 要抽共用入口邏輯時，優先對齊 **FamiGate 核心**（famibook／kodohon／gamepal 模板），不要因為本 repo 已有 `gate.js` 就整包當標準複製到其他門面。
+- 未經「有必要」三條自審，禁止 fork `gate.js` 或自造第三種卡片／按鈕。
+
+## 改共用 chrome 時
+
+1. 先讀 `fami-shared-ui` 詞彙表，對照活標本 diff。
+2. 兄弟門面（book／kodohon／gamepal）若也掛同一顆物件，同一回合一併改。
+3. 會上 Pages 的檔：驗證後 push `main`、提高 `?v=`（見 `always-push-github`）。**本 wave 若只做 rules／AGENTS，不動 runtime。**
+
+## 不要
+
+- 不要把 Famiphoto 邀請／Apple MFA 流程當成所有 Fami 門面的預設 gate。
+- 不要各做第三種卡、私製返回／確認、或把入口色塊留到個人頁當精簡殼。
+- 不要合併 `gate.js` 與 `tags.js` 的鍵盤處理成一支函式。
+- 不要把 exe／bat 當交付入口；使用者入口一律 GitHub Pages。

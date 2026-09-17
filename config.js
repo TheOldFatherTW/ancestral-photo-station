@@ -1,1 +1,1 @@
-window.VAULT_ORIGIN = "https://sorted-mill-classroom-radio.trycloudflare.com";
+window.VAULT_ORIGIN = "https://replacing-desirable-latter-borders.trycloudflare.com";

@@ -1506,6 +1506,70 @@
       renderSuggest();
     }
 
+    function isAutoPersonCluster(tag) {
+      return !!(
+        tag &&
+        tag.kind === "person" &&
+        tag.auto &&
+        /^p\d+$/i.test(String(tag.label || ""))
+      );
+    }
+
+    function tagPhotoCount(tagId) {
+      const row = tagById(tagId);
+      return row ? Number(row.count) || 0 : 0;
+    }
+
+    function runMerge(src, dst, done) {
+      runChange(
+        { action: "merge", id: src.id, into: dst.id },
+        "正在把 #" + src.label + " 併進 #" + dst.label + "…",
+        "已併進 #" + dst.label
+      );
+      if (done) done();
+    }
+
+    function askNamedMergeConfirm(src, dst, onClose) {
+      const count = tagPhotoCount(src.id);
+      const mask = document.createElement("div");
+      mask.className = "batch-tag-mask retag-choice-mask retag-confirm-mask";
+      const card = document.createElement("div");
+      card.className = "batch-tag-sheet retag-choice-sheet";
+      const head = document.createElement("div");
+      head.className = "batch-tag-head";
+      const title = document.createElement("p");
+      title.textContent =
+        "此步驟會修改 " + count + " 張照片的標記，無法復原。";
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "batch-tag-close";
+      close.setAttribute("aria-label", "關閉");
+      close.textContent = "×";
+      function shut() {
+        mask.remove();
+        if (onClose) onClose();
+      }
+      close.addEventListener("click", shut);
+      head.appendChild(title);
+      head.appendChild(close);
+      const go = document.createElement("button");
+      go.type = "button";
+      go.className = "tag-apply";
+      const face = document.createElement("span");
+      face.className = "tag-apply-face";
+      face.textContent = "修改標籤";
+      go.appendChild(face);
+      go.addEventListener("click", function () {
+        shut();
+        runMerge(src, dst);
+      });
+      card.appendChild(head);
+      card.appendChild(go);
+      mask.appendChild(card);
+      lockSheetPage(mask, shut);
+      document.body.appendChild(mask);
+    }
+
     function askRetagChoice(src, dst) {
       const mask = document.createElement("div");
       mask.className = "batch-tag-mask retag-choice-mask";
@@ -1527,39 +1591,50 @@
       close.addEventListener("click", shut);
       head.appendChild(title);
       head.appendChild(close);
-      const actions = document.createElement("div");
-      actions.className = "retag-choice-actions";
-      const one = document.createElement("button");
-      one.type = "button";
-      one.className = "retag-choice-plain";
-      one.textContent = "只改這張";
-      one.addEventListener("click", function () {
-        shut();
-        runChange(
-          { action: "retag_on_photo", id: src.id, into: dst.id },
-          "正在把這張改成 #" + dst.label + "…",
-          "這張已改成 #" + dst.label
-        );
-      });
-      const all = document.createElement("button");
-      all.type = "button";
-      all.className = "tag-apply";
+      const coverLab = document.createElement("label");
+      coverLab.className = "ask-skip retag-cover-all";
+      const coverName = document.createElement("span");
+      coverName.textContent = "覆蓋所有";
+      const coverAll = document.createElement("input");
+      coverAll.type = "checkbox";
+      coverAll.setAttribute("role", "switch");
+      coverAll.checked = true;
+      const coverSw = document.createElement("span");
+      coverSw.className = "ask-sw";
+      coverLab.appendChild(coverName);
+      coverLab.appendChild(coverAll);
+      coverLab.appendChild(coverSw);
+      const go = document.createElement("button");
+      go.type = "button";
+      go.className = "tag-apply";
       const face = document.createElement("span");
       face.className = "tag-apply-face";
-      face.textContent = "全部改成 #" + dst.label;
-      all.appendChild(face);
-      all.addEventListener("click", function () {
-        shut();
-        runChange(
-          { action: "merge", id: src.id, into: dst.id },
-          "正在把 #" + src.label + " 併進 #" + dst.label + "…",
-          "已併進 #" + dst.label
-        );
+      function syncGo() {
+        face.textContent = coverAll.checked ? "全部修改" : "只改這張";
+      }
+      coverAll.addEventListener("change", syncGo);
+      syncGo();
+      go.appendChild(face);
+      go.addEventListener("click", function () {
+        if (!coverAll.checked) {
+          shut();
+          runChange(
+            { action: "retag_on_photo", id: src.id, into: dst.id },
+            "正在把這張改成 #" + dst.label + "…",
+            "這張已改成 #" + dst.label
+          );
+          return;
+        }
+        if (isAutoPersonCluster(src)) {
+          shut();
+          runMerge(src, dst);
+          return;
+        }
+        askNamedMergeConfirm(src, dst, shut);
       });
-      actions.appendChild(one);
-      actions.appendChild(all);
       card.appendChild(head);
-      card.appendChild(actions);
+      card.appendChild(coverLab);
+      card.appendChild(go);
       mask.appendChild(card);
       lockSheetPage(mask, shut);
       document.body.appendChild(mask);

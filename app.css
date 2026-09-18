@@ -2003,28 +2003,17 @@ button.tag-chip {
   font-size: 16px;
   font-weight: 700;
 }
-.retag-choice-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.retag-choice-actions button.tag-apply {
-  margin: 0;
-}
-button.retag-choice-plain {
-  width: 100%;
+.retag-choice-sheet > .ask-skip.retag-cover-all {
+  margin: 0 0 14px;
   min-height: 44px;
-  margin: 0;
-  padding: 10px 16px;
-  border: 1.5px solid var(--line);
-  border-radius: 999px;
-  background: #fff;
-  color: var(--ink);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
-  -webkit-appearance: none;
-  appearance: none;
-  touch-action: manipulation;
+}
+.retag-choice-sheet > .tag-apply {
+  margin: 0;
+}
+.retag-confirm-mask {
+  z-index: 200001;
 }
 button.batch-tag-close {
   position: relative;

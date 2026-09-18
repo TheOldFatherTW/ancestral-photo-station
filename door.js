@@ -29,7 +29,7 @@
   let upBar = null;
   let upHide = 0;
   let latestPeople = {};
-  let uploadViews = {};
+  let uploadWork = null;
   let settingsWrap = null;
   let settingsCatch = null;
   const UPLOAD_CAP = 480 * 1024 * 1024;
@@ -37,6 +37,46 @@
   // gives up, and that the bar moves often, since Safari reports no progress of its own.
   const BATCH_CAP = 12 * 1024 * 1024;
   let backupAsk = {};
+
+  function bumpWork(phase, percent) {
+    if (!window.FamilyFeed) return;
+    if (window.FamilyFeed.isWorkActive && window.FamilyFeed.isWorkActive()) {
+      if (window.FamilyFeed.updateWork) window.FamilyFeed.updateWork({ phase: phase, percent: percent });
+    } else if (window.FamilyFeed.showWork) {
+      window.FamilyFeed.showWork({ phase: phase, percent: percent });
+    }
+  }
+
+  function clearWork() {
+    if (window.FamilyFeed && window.FamilyFeed.clearWork) window.FamilyFeed.clearWork();
+  }
+
+  function finishUploadWork() {
+    if (!uploadWork) return;
+    const w = uploadWork;
+    uploadWork = null;
+    if (uploadBtn) uploadBtn.classList.remove("is-run");
+    clearWork();
+    if (w.pinned && w.pinned.length && openPerson === w.person && window.FamilyFeed) {
+      window.FamilyFeed.start(w.person, [], { pin: w.pinned, trash: false });
+    }
+  }
+
+  function abortUploadWork() {
+    uploadWork = null;
+    if (uploadBtn) uploadBtn.classList.remove("is-run");
+    clearWork();
+  }
+
+  function syncUploadWorkTag(person, tagJob) {
+    if (!uploadWork || uploadWork.person !== person || uploadWork.phase !== "tag") return;
+    if (tagJob && tagJob.state === "running") {
+      uploadWork.sawTag = true;
+      bumpWork("tag", tagJob.percent);
+    } else if (uploadWork.sawTag || Date.now() - uploadWork.doneAt > 12000) {
+      finishUploadWork();
+    }
+  }
   let selectLine = "";
   const CAMERA =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="8" width="17" height="11.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 8l1.4-2.4h5.2L16 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="13.6" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>';
@@ -409,8 +449,8 @@
   // A phone that will not sync to iCloud and will not talk to Windows over the cable can
   // still open this page, so hand-picking the stranded pictures is the last way in.
   function pickUpload(person, btn) {
-    if (uploadBusy) {
-      fail("上一批還在傳，傳完再選下一批");
+    if (uploadBusy || uploadWork) {
+      fail("上一批還在處理，稍後再選");
       return;
     }
     uploadPerson = person;
@@ -441,16 +481,14 @@
         // Let the strip paint before the sizes get added up, so a big pick does not
         // spend its first moment back from the picker looking just as dead as before.
         if (uploadBtn) uploadBtn.classList.add("is-run");
-        paintUpload(who, {
-            running: true,
-            done: false,
-            percent: 0,
-            doneCount: 0,
-            totalCount: picked.length,
-            busyText: "備份中...",
-            doneText: "備份完成",
-            waitText: "尚未檢查",
-          });
+        uploadWork = {
+          person: who,
+          phase: "upload",
+          pinned: [],
+          doneAt: 0,
+          sawTag: false,
+        };
+        bumpWork("upload", 0);
         window.setTimeout(function () {
           sendUploads(who, picked);
         }, 50);
@@ -467,8 +505,16 @@
     }
     uploadBusy = true;
     const url = api("/api/upload?person=" + encodeURIComponent(person));
-    // Always send over the tunnel. Skipping "already in iCloud" made the avatar
-    // look busy while nothing reached the home disk.
+    if (!uploadWork || uploadWork.person !== person) {
+      uploadWork = {
+        person: person,
+        phase: "upload",
+        pinned: [],
+        doneAt: 0,
+        sawTag: false,
+      };
+      bumpWork("upload", 0);
+    }
     const groups = [];
     let saved = 0;
     let already = 0;
@@ -490,7 +536,6 @@
       total += f.size;
     });
     let done = 0;
-    let handled = 0;
     const why = [];
     function blame(word) {
       if (why.indexOf(word) < 0) why.push(word);
@@ -504,16 +549,7 @@
           body.append("photo", f, f.name || "photo.jpg");
           weight += f.size;
         });
-        paintUpload(person, {
-          running: true,
-          done: false,
-          percent: total ? Math.round((done * 100) / total) : 0,
-          doneCount: handled,
-          totalCount: files.length,
-          busyText: "備份中...",
-          doneText: "備份完成",
-          waitText: "尚未檢查",
-        });
+        bumpWork("upload", total ? Math.round((done * 100) / total) : 0);
         try {
           const res = await fetch(url, { method: "POST", body: body });
           const data = await res.json().catch(function () {
@@ -535,50 +571,34 @@
           failed += group.length;
         }
         done += weight;
-        handled += group.length;
       }
       const complete = Math.min(files.length, saved + already);
-      paintUpload(person, {
-        running: false,
-        done: failed === 0 && complete > 0,
-        error: failed > 0 || complete === 0,
-        errorText: failed
-          ? "備份未完成" + (why.length ? "，" + why.join("、") : "")
-          : "沒有存進櫃子",
-        info: failed === 0 && complete > 0,
-        infoText: saved ? "收進來 " + saved + " 張" : "這些照片櫃子裡已經有了",
-        percent: failed ? Math.round((complete * 100) / Math.max(1, files.length)) : 100,
-        doneCount: complete,
-        totalCount: files.length,
-        busyText: "備份中...",
-        doneText: saved ? "收進來 " + saved + " 張" : "備份完成",
-        waitText: "尚未檢查",
-      });
-      if (complete > 0) {
-        lastCab = "";
-        await boot();
-        if (openPerson === person && window.FamilyFeed) {
-          window.FamilyFeed.start(person, [], { pin: pinned, trash: false });
-        }
+      if (failed > 0 || complete === 0) {
+        abortUploadWork();
+        fail(
+          failed
+            ? "備份未完成" + (why.length ? "，" + why.join("、") : "")
+            : "沒有存進櫃子"
+        );
+        return;
+      }
+      bumpWork("upload", 100);
+      uploadWork.pinned = pinned;
+      lastCab = "";
+      await boot();
+      if (saved > 0) {
+        uploadWork.phase = "tag";
+        uploadWork.doneAt = Date.now();
+        bumpWork("tag", 0);
+        syncUploadWorkTag(person, (latestPeople[person] && latestPeople[person].tag) || {});
+      } else {
+        finishUploadWork();
       }
     } catch (err) {
-      paintUpload(person, {
-        running: false,
-        done: false,
-        error: true,
-        errorText: "備份失敗",
-        percent: null,
-        doneCount: 0,
-        totalCount: files.length,
-        busyText: "備份中...",
-        doneText: "備份完成",
-        waitText: "尚未檢查",
-      });
+      abortUploadWork();
+      fail("備份失敗");
     } finally {
       uploadBusy = false;
-      if (uploadBtn) uploadBtn.classList.remove("is-run");
-      closeUp(20000);
-      clearUploadView(person, 20000);
     }
   }
 
@@ -890,35 +910,6 @@
     return row;
   }
 
-  function setUploadView(person, view) {
-    uploadViews[person] = view;
-    const p = latestPeople[person];
-    const hud = hudFor(person);
-    if (p && hud) fillHud(hud, p);
-  }
-
-  function paintUpload(person, view) {
-    setUploadView(person, view);
-  }
-
-  function clearUploadView(person, after) {
-    const view = uploadViews[person];
-    window.setTimeout(function () {
-      if (uploadViews[person] !== view) return;
-      delete uploadViews[person];
-      const p = latestPeople[person];
-      const hud = hudFor(person);
-      if (p && hud) fillHud(hud, p);
-    }, after);
-  }
-
-  function fillAmount(running, percent) {
-    if (!running) return null;
-    const n = Number(percent);
-    if (Number.isFinite(n)) return Math.max(0, Math.min(100, n));
-    return 42;
-  }
-
   function paintBackdrop() {
     if (isBooting()) return;
     const blobs = document.getElementById("blobs");
@@ -974,7 +965,7 @@
   function fillHud(hud, p) {
     if (!hud || !p) return;
     const id = p.id;
-    const local = uploadViews[id] || null;
+    syncUploadWorkTag(id, p.tag || {});
     const backupRun = p.sync === "running";
     if (backupRun) backupAsk[id] = false;
     if (!backupRun && (p.sync === "synced" || p.percent === 100)) {
@@ -982,66 +973,14 @@
         localStorage.setItem("family.backupDone." + id, "1");
       } catch (e) {}
     }
-    const localRun = !!(local && local.running) || (uploadBusy && uploadPerson === id);
-    const localTail =
-      !!(local && !local.running && (local.done || local.error || local.info));
+    const localRun =
+      !!(uploadWork && uploadWork.person === id && uploadWork.phase === "upload") ||
+      (uploadBusy && uploadPerson === id);
     const icloudRun = !localRun && (backupRun || !!backupAsk[id]);
-    const showRun = localRun || icloudRun;
-    const shownLocal = local && (local.running || localTail) ? local : null;
-    let busyText = "備份中...";
-    if (!shownLocal && p.backup_phase === "checking") busyText = "核對中...";
-    if (!shownLocal && p.backup_phase === "retry") busyText = "重新連線...";
-    const backupView = {
-      running: showRun,
-      done: !!(shownLocal && shownLocal.done),
-      error: !!(shownLocal && shownLocal.error),
-      errorText: shownLocal && shownLocal.errorText,
-      info: !!(shownLocal && shownLocal.info),
-      infoText: shownLocal && shownLocal.infoText,
-      percent: shownLocal && shownLocal.percent != null ? shownLocal.percent : p.percent,
-      doneCount: shownLocal ? shownLocal.doneCount : p.backup_done,
-      totalCount: shownLocal ? shownLocal.totalCount : p.backup_total,
-      busyText: busyText,
-      doneText: (shownLocal && shownLocal.doneText) || "備份完成",
-      waitText: "尚未檢查",
-    };
-    const job = p.tag || {};
-    const tagRun = job.state === "running";
-    const localTag = tagRun && !!(local && (local.done || local.info));
-    const tagView = {
-      running: tagRun,
-      done: false,
-      percent: tagRun ? job.percent : null,
-      busyText: "自動標記中…",
-      doneText: "標記完成",
-      waitText: "尚未標記",
-    };
-    const backupFill = fillAmount(showRun, backupView.percent);
-    const tagFill = fillAmount(tagRun, tagView.percent);
-    let fill = 0;
-    const liquidOn = showRun || tagRun;
-    if (showRun && tagRun) {
-      fill = ((backupFill == null ? 42 : backupFill) + (tagFill == null ? 42 : tagFill)) / 2;
-    } else if (showRun) {
-      fill = backupFill == null ? 42 : backupFill;
-    } else if (tagRun) {
-      fill = tagFill == null ? 42 : tagFill;
-    }
     const cover = hud.querySelector(".cab-cover");
-    if (cover) cover.classList.toggle("is-run", liquidOn);
-    const liquid = hud.querySelector(".cab-liquid");
-    if (liquid) {
-      liquid.hidden = !liquidOn;
-      liquid.style.setProperty("--fill", fill + "%");
-      liquid.classList.toggle("is-local", localRun || localTag || localTail);
-    }
-    const think = hud.querySelector(".cab-cover > .thinking-five");
-    if (think) think.hidden = !liquidOn;
+    if (cover) cover.classList.remove("is-run");
     const cap = hud.querySelector(".cab-caption");
-    if (localRun) paintCap(cap, backupView, "");
-    else if (tagRun) paintCap(cap, tagView, "");
-    else if (localTail) paintCap(cap, backupView, "");
-    else paintCap(cap, null, selectLine);
+    paintCap(cap, null, selectLine);
     const box = settingsWrap || document.getElementById("album-settings");
     const menu = document.querySelector(".settings-menu");
     if (box && box.dataset.person === id) {
@@ -1110,18 +1049,6 @@
     } catch (e) {}
     const hud = hudFor(person);
     if (hud && row) fillHud(hud, row);
-    else if (hud) {
-      const cover = hud.querySelector(".cab-cover");
-      if (cover) cover.classList.add("is-run");
-      const liquid = hud.querySelector(".cab-liquid");
-      if (liquid) {
-        liquid.hidden = false;
-        liquid.style.setProperty("--fill", "42%");
-        liquid.classList.remove("is-local");
-      }
-      const think = hud.querySelector(".cab-cover > .thinking-five");
-      if (think) think.hidden = false;
-    }
     paintBackdrop();
     fetch(api("/api/sync?person=" + encodeURIComponent(person)), { method: "POST" })
       .then(function (res) {

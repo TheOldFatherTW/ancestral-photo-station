@@ -37,9 +37,49 @@
   let viewing = false;
   let picked = {};
   let selectHint = "";
+  let workTile = null;
   try {
     caches.delete("famiphoto-thumbs-v1");
   } catch (e) {}
+
+  function workPctText(percent) {
+    const n = Number(percent);
+    if (!Number.isFinite(n)) return "—";
+    return Math.round(Math.max(0, Math.min(100, n))) + "%";
+  }
+
+  function paintWorkTile(phase, percent) {
+    const feed = document.getElementById("feed");
+    if (!feed) return;
+    if (!workTile) {
+      workTile = document.createElement("div");
+      workTile.className = "tile tile-work";
+      workTile.setAttribute("aria-busy", "true");
+      const inner = document.createElement("div");
+      inner.className = "tile-work-inner";
+      const step = document.createElement("span");
+      step.className = "tile-work-step";
+      const pct = document.createElement("span");
+      pct.className = "tile-work-pct";
+      inner.appendChild(step);
+      inner.appendChild(pct);
+      workTile.appendChild(inner);
+    }
+    const step = workTile.querySelector(".tile-work-step");
+    const pct = workTile.querySelector(".tile-work-pct");
+    if (step) step.textContent = phase === "tag" ? "標記中..." : "上傳中...";
+    if (pct) pct.textContent = workPctText(percent);
+    if (workTile.parentNode !== feed) {
+      const anchor = feed.querySelector(".tile:not(.tile-work), .feed-month, .trash-bar");
+      if (anchor) feed.insertBefore(workTile, anchor);
+      else feed.appendChild(workTile);
+    }
+  }
+
+  function clearWorkTile() {
+    if (workTile && workTile.parentNode) workTile.parentNode.removeChild(workTile);
+    workTile = null;
+  }
 
   function api(path) {
     const url = ORIGIN + path;
@@ -2032,6 +2072,17 @@
       const hint = document.getElementById("feed-hint");
       if (sentinel) sentinel.hidden = true;
       if (hint) hint.hidden = true;
+      clearWorkTile();
+    },
+    showWork: function (opts) {
+      paintWorkTile((opts && opts.phase) || "upload", opts && opts.percent);
+    },
+    updateWork: function (opts) {
+      paintWorkTile((opts && opts.phase) || "upload", opts && opts.percent);
+    },
+    clearWork: clearWorkTile,
+    isWorkActive: function () {
+      return !!(workTile && workTile.parentNode);
     },
   };
 })();

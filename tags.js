@@ -1506,16 +1506,63 @@
       renderSuggest();
     }
 
-    function askMerge(src, dst) {
-      const ok = window.confirm(
-        "要把「#" + src.label + "」改成「#" + dst.label + "」嗎？"
-      );
-      if (!ok) return;
-      runChange(
-        { action: "merge", id: src.id, into: dst.id },
-        "正在把 #" + src.label + " 併進 #" + dst.label + "…",
-        "已併進 #" + dst.label
-      );
+    function askRetagChoice(src, dst) {
+      const mask = document.createElement("div");
+      mask.className = "batch-tag-mask retag-choice-mask";
+      const card = document.createElement("div");
+      card.className = "batch-tag-sheet retag-choice-sheet";
+      const head = document.createElement("div");
+      head.className = "batch-tag-head";
+      const title = document.createElement("p");
+      title.textContent =
+        "這張標成 #" + src.label + "，要改成 #" + dst.label + " 嗎？";
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "batch-tag-close";
+      close.setAttribute("aria-label", "關閉");
+      close.textContent = "×";
+      function shut() {
+        mask.remove();
+      }
+      close.addEventListener("click", shut);
+      head.appendChild(title);
+      head.appendChild(close);
+      const actions = document.createElement("div");
+      actions.className = "retag-choice-actions";
+      const one = document.createElement("button");
+      one.type = "button";
+      one.className = "retag-choice-plain";
+      one.textContent = "只改這張";
+      one.addEventListener("click", function () {
+        shut();
+        runChange(
+          { action: "retag_on_photo", id: src.id, into: dst.id },
+          "正在把這張改成 #" + dst.label + "…",
+          "這張已改成 #" + dst.label
+        );
+      });
+      const all = document.createElement("button");
+      all.type = "button";
+      all.className = "tag-apply";
+      const face = document.createElement("span");
+      face.className = "tag-apply-face";
+      face.textContent = "全部改成 #" + dst.label;
+      all.appendChild(face);
+      all.addEventListener("click", function () {
+        shut();
+        runChange(
+          { action: "merge", id: src.id, into: dst.id },
+          "正在把 #" + src.label + " 併進 #" + dst.label + "…",
+          "已併進 #" + dst.label
+        );
+      });
+      actions.appendChild(one);
+      actions.appendChild(all);
+      card.appendChild(head);
+      card.appendChild(actions);
+      mask.appendChild(card);
+      lockSheetPage(mask, shut);
+      document.body.appendChild(mask);
     }
 
     function askDeleteTag(tag) {
@@ -1592,7 +1639,7 @@
           if (Date.now() < searchArm) return;
           const target = renameTarget();
           if (target) {
-            askMerge(target, hit);
+            askRetagChoice(target, hit);
             return;
           }
           ghostChip(hit.label);
@@ -1732,7 +1779,7 @@
           return String(hit.label || "").toLowerCase() === label.toLowerCase();
         });
         if (exact.length === 1) {
-          askMerge(target, exact[0]);
+          askRetagChoice(target, exact[0]);
           return;
         }
         runChange(

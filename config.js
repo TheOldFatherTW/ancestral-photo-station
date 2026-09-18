@@ -1,1 +1,1 @@
-window.VAULT_ORIGIN = "https://replacing-desirable-latter-borders.trycloudflare.com";
+window.VAULT_ORIGIN = "https://jeremy-covering-degrees-faces.trycloudflare.com";

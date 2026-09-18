@@ -358,78 +358,16 @@ button.apple-next path {
   pointer-events: none;
   touch-action: none;
 }
-.tile.is-run {
-  isolation: isolate;
-  padding: var(--apply-ring);
+.tile[data-work="1"] .tile-plus {
+  flex-direction: column;
+  gap: 8px;
 }
-.tile.is-run::before {
-  content: "";
-  position: absolute;
-  z-index: 0;
-  left: 50%;
-  top: 50%;
-  width: 200vw;
-  height: 200vw;
-  border-radius: 0;
-  background: var(--ring-conic-0);
-  animation: tag-apply-spin 2.4s linear infinite;
-  pointer-events: none;
-}
-.tile.is-run::after {
-  content: "";
-  position: absolute;
-  z-index: 1;
-  inset: var(--apply-ring);
-  background: #efe8ea;
-  pointer-events: none;
-}
-.tile.tile-add.is-run::after {
-  background: #f7f7f7;
-}
-.tile.is-run .tile-shield {
-  inset: var(--apply-ring);
-}
-.tile.is-run .tile-job-hud {
-  left: var(--apply-ring);
-  right: var(--apply-ring);
-  bottom: var(--apply-ring);
-}
-.tile-job-hud {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 4;
-  padding: 10px 8px 40px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0));
-  pointer-events: none;
-}
-.tile-job-hud .hp-label {
-  flex-wrap: wrap;
-  row-gap: 4px;
-  font-size: calc(13px * 0.65);
-  color: #fff;
-}
-.tile-job-hud .hp-text {
-  color: #fff;
-}
-.tile-job-hud .hp-alt {
-  color: #fff;
-}
-.tile-job-hud .hp-think {
-  flex: 1 1 100%;
-  justify-content: flex-start;
-  order: 3;
-}
-.tile-job-hud .hp-meter {
-  flex: 1 1 100%;
-  order: 4;
-  margin-top: 2px;
-}
-.tile-job-hud .hp-track {
-  height: 8px;
-  background: rgba(255, 255, 255, 0.22);
-  box-shadow: none;
+.tile[data-work="1"] .hp-text,
+.tile[data-work="1"] .hp-alt {
+  color: var(--mute);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 .tile .tile-plus {
   position: absolute;
@@ -2447,8 +2385,7 @@ button.batch-tag-close::before {
   .cab-cover.is-run .cab-ring,
   .ins-icon.is-run .ins-ring,
   button.tag-apply::before,
-  .cab-wave,
-  .tile.is-run::before {
+  .cab-wave {
     animation: none;
   }
   .thinking-five span,

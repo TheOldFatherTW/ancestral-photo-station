@@ -89,6 +89,35 @@
       bumpWork("tag", tagWorkPct(tagJob));
     }
   }
+
+  function backupWorkPct(p) {
+    const n = Number(p && p.percent);
+    if (Number.isFinite(n)) return Math.max(0, Math.min(100, Math.round(n)));
+    const total = Number(p && p.backup_total) || 0;
+    const done = Number(p && p.backup_done) || 0;
+    if (total > 0) return Math.max(0, Math.min(100, Math.round((done * 100) / total)));
+    return 0;
+  }
+
+  function syncCabinetWork(p) {
+    if (!p) return;
+    if (uploadWork && uploadWork.person === p.id) {
+      if (uploadWork.phase === "tag") syncUploadWorkTag(p.id, p.tag || {});
+      return;
+    }
+    if (openPerson && p.id !== openPerson) return;
+    const backupRun = p.sync === "running" || !!backupAsk[p.id];
+    const tagRun = !!(p.tag && p.tag.state === "running");
+    if (backupRun) {
+      bumpWork("backup", backupWorkPct(p));
+      return;
+    }
+    if (tagRun) {
+      bumpWork("tag", tagWorkPct(p.tag));
+      return;
+    }
+    clearWork();
+  }
   let selectLine = "";
   const CAMERA =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="8" width="17" height="11.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 8l1.4-2.4h5.2L16 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="13.6" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>';
@@ -983,7 +1012,7 @@
   function fillHud(hud, p) {
     if (!hud || !p) return;
     const id = p.id;
-    syncUploadWorkTag(id, p.tag || {});
+    syncCabinetWork(p);
     const backupRun = p.sync === "running";
     if (backupRun) backupAsk[id] = false;
     if (!backupRun && (p.sync === "synced" || p.percent === 100)) {

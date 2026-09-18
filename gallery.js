@@ -38,6 +38,7 @@
   let picked = {};
   let selectHint = "";
   let workTile = null;
+  let workState = null;
   try {
     caches.delete("famiphoto-thumbs-v1");
   } catch (e) {}
@@ -48,58 +49,72 @@
     return Math.max(0, Math.min(100, Math.round(n)));
   }
 
+  function workLabel(phase) {
+    if (phase === "tag") return "標記中...";
+    if (phase === "backup") return "備份中...";
+    return "上傳中...";
+  }
+
+  function canShowWork() {
+    return !!(
+      currentPerson &&
+      !folderWall &&
+      !folderId &&
+      !fromClass &&
+      !trashMode &&
+      !favMode &&
+      !videoMode
+    );
+  }
+
+  function hideWorkTile() {
+    if (workTile && workTile.parentNode) workTile.parentNode.removeChild(workTile);
+  }
+
   function paintWorkTile(phase, percent) {
+    if (phase) {
+      workState = { phase: phase, percent: workPct(percent) };
+    }
+    if (!workState) {
+      hideWorkTile();
+      return;
+    }
     const feed = document.getElementById("feed");
-    if (!feed) return;
-    const pct = workPct(percent);
-    const running = true;
+    if (!feed || !canShowWork()) {
+      hideWorkTile();
+      return;
+    }
     if (!workTile) {
       workTile = document.createElement("div");
-      workTile.className = "tile tile-add is-run";
+      workTile.className = "tile tile-add";
       workTile.dataset.work = "1";
       workTile.setAttribute("aria-busy", "true");
+      const inner = document.createElement("span");
+      inner.className = "tile-plus";
+      inner.innerHTML =
+        '<div class="thinking-five hp-think" aria-hidden="true">' +
+        "<span></span><span></span><span></span><span></span><span></span></div>" +
+        '<span class="hp-text"></span>' +
+        '<span class="hp-alt"><span class="hp-alt-pct"></span></span>';
       const shield = document.createElement("span");
       shield.className = "tile-shield";
-      const hud = document.createElement("div");
-      hud.className = "tile-job-hud hp is-run";
-      hud.innerHTML =
-        '<div class="hp-label">' +
-        '<span class="hp-text"></span>' +
-        '<span class="hp-alt"><span class="hp-alt-pct"></span></span>' +
-        '<div class="thinking-five hp-think" aria-hidden="true">' +
-        "<span></span><span></span><span></span><span></span><span></span></div></div>" +
-        '<div class="hp-meter"><div class="hp-track"><div class="hp-fill"></div></div></div>';
+      workTile.appendChild(inner);
       workTile.appendChild(shield);
-      workTile.appendChild(hud);
     }
-    workTile.classList.toggle("is-run", running);
-    const hud = workTile.querySelector(".tile-job-hud");
-    if (hud) {
-      if (phase === "tag") hud.dataset.kind = "tag";
-      else delete hud.dataset.kind;
-      hud.classList.toggle("is-run", running);
-      const text = hud.querySelector(".hp-text");
-      const think = hud.querySelector(".thinking-five");
-      const meter = hud.querySelector(".hp-meter");
-      const fill = hud.querySelector(".hp-fill");
-      const alt = hud.querySelector(".hp-alt");
-      const altPct = hud.querySelector(".hp-alt-pct");
-      if (text) text.textContent = phase === "tag" ? "標記中..." : "上傳中...";
-      if (think) think.hidden = !running;
-      if (meter) meter.hidden = !running;
-      if (fill) fill.style.width = pct + "%";
-      if (alt) alt.hidden = !running;
-      if (altPct) altPct.textContent = pct + "%";
-    }
-    if (workTile.parentNode !== feed) {
-      const anchor = feed.querySelector(".feed-month, .trash-bar, .tile:not([data-work])");
-      if (anchor) feed.insertBefore(workTile, anchor);
-      else feed.appendChild(workTile);
+    const text = workTile.querySelector(".hp-text");
+    const altPct = workTile.querySelector(".hp-alt-pct");
+    if (text) text.textContent = workLabel(workState.phase);
+    if (altPct) altPct.textContent = workState.percent + "%";
+    const bar = feed.querySelector(".trash-bar");
+    const first = bar ? bar.nextSibling : feed.firstChild;
+    if (workTile.parentNode !== feed || workTile !== first) {
+      feed.insertBefore(workTile, first);
     }
   }
 
   function clearWorkTile() {
-    if (workTile && workTile.parentNode) workTile.parentNode.removeChild(workTile);
+    workState = null;
+    hideWorkTile();
     workTile = null;
   }
 
@@ -896,6 +911,7 @@
           );
         });
         feed.appendChild(folderTile({ kind: "add", id: "add" }));
+        paintWorkTile();
       })
       .catch(function () {
         if (my !== run) return;
@@ -1655,13 +1671,14 @@
           slides.push(slideFor(item, a));
           feed.appendChild(a);
         });
+        paintWorkTile();
       }
 
       function clearTiles() {
         lastGroup = "";
         loadedItems.length = 0;
         slides.length = 0;
-        feed.querySelectorAll(".tile, .feed-month, .feed-empty").forEach(function (el) {
+        feed.querySelectorAll(".tile:not([data-work]), .feed-month, .feed-empty").forEach(function (el) {
           el.remove();
         });
       }
@@ -1678,8 +1695,13 @@
               : feed.dataset.q || feed.dataset.qr || (feed.dataset.tags || "").length
                 ? "沒有照片。"
                 : "這個櫃子還沒有照片。";
-        if (!trashMode) feed.innerHTML = "";
+        if (!trashMode) {
+          feed.querySelectorAll(".tile:not([data-work]), .feed-month, .feed-empty").forEach(function (el) {
+            el.remove();
+          });
+        }
         feed.appendChild(empty);
+        paintWorkTile();
       }
 
       function sentinelNear() {
@@ -1747,8 +1769,11 @@
             const empty = document.createElement("p");
             empty.className = "feed-empty is-offline";
             empty.textContent = "維護中,請5分鐘後再試";
-            feed.innerHTML = "";
+            feed.querySelectorAll(".tile:not([data-work]), .feed-month, .feed-empty").forEach(function (el) {
+              el.remove();
+            });
             feed.appendChild(empty);
+            paintWorkTile();
           }
         } finally {
           loading = false;
@@ -1782,6 +1807,7 @@
         window.feedObserver.observe(sentinel);
       }
       showHint();
+      paintWorkTile();
       if (offset) refreshHead();
       else loadMore();
     },
@@ -2094,7 +2120,7 @@
       const hint = document.getElementById("feed-hint");
       if (sentinel) sentinel.hidden = true;
       if (hint) hint.hidden = true;
-      clearWorkTile();
+      hideWorkTile();
     },
     showWork: function (opts) {
       paintWorkTile((opts && opts.phase) || "upload", opts && opts.percent);

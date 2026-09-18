@@ -68,13 +68,25 @@
     clearWork();
   }
 
+  function tagWorkPct(tagJob) {
+    if (!tagJob) return 0;
+    const pct = Number(tagJob.percent);
+    if (Number.isFinite(pct)) return Math.max(0, Math.min(100, Math.round(pct)));
+    const total = Number(tagJob.total) || 0;
+    const done = Number(tagJob.done) || 0;
+    if (total > 0) return Math.max(0, Math.min(100, Math.round((done * 100) / total)));
+    return 0;
+  }
+
   function syncUploadWorkTag(person, tagJob) {
     if (!uploadWork || uploadWork.person !== person || uploadWork.phase !== "tag") return;
     if (tagJob && tagJob.state === "running") {
       uploadWork.sawTag = true;
-      bumpWork("tag", tagJob.percent);
+      bumpWork("tag", tagWorkPct(tagJob));
     } else if (uploadWork.sawTag || Date.now() - uploadWork.doneAt > 12000) {
       finishUploadWork();
+    } else {
+      bumpWork("tag", tagWorkPct(tagJob));
     }
   }
   let selectLine = "";
@@ -549,14 +561,19 @@
           body.append("photo", f, f.name || "photo.jpg");
           weight += f.size;
         });
-        bumpWork("upload", total ? Math.round((done * 100) / total) : 0);
         try {
-          const res = await fetch(url, { method: "POST", body: body });
-          const data = await res.json().catch(function () {
-            return null;
+          const xhr = await postFile(url, body, function (batchPct) {
+            const sent = done + (weight * batchPct) / 100;
+            bumpWork("upload", total ? Math.round((sent * 100) / total) : batchPct);
           });
-          if (!res.ok || !data) {
-            blame((data && data.error) || "伺服器回 " + res.status);
+          let data = null;
+          try {
+            data = JSON.parse(xhr.responseText || "null");
+          } catch (parseErr) {
+            data = null;
+          }
+          if (!data) {
+            blame("伺服器回 " + xhr.status);
             failed += group.length;
           } else {
             saved += (data.saved || []).length;
@@ -571,6 +588,7 @@
           failed += group.length;
         }
         done += weight;
+        bumpWork("upload", total ? Math.round((done * 100) / total) : 100);
       }
       const complete = Math.min(files.length, saved + already);
       if (failed > 0 || complete === 0) {
@@ -1302,7 +1320,7 @@
     if (polling) return;
     polling = true;
     (function poll() {
-      const wait = window._familyRunning || window._familyTagging ? 3000 : 12000;
+      const wait = uploadWork || window._familyRunning || window._familyTagging ? 3000 : 12000;
       setTimeout(function () {
         if (!ORIGIN) {
           poll();

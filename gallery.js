@@ -42,35 +42,57 @@
     caches.delete("famiphoto-thumbs-v1");
   } catch (e) {}
 
-  function workPctText(percent) {
+  function workPct(percent) {
     const n = Number(percent);
-    if (!Number.isFinite(n)) return "—";
-    return Math.round(Math.max(0, Math.min(100, n))) + "%";
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.min(100, Math.round(n)));
   }
 
   function paintWorkTile(phase, percent) {
     const feed = document.getElementById("feed");
     if (!feed) return;
+    const pct = workPct(percent);
+    const running = true;
     if (!workTile) {
       workTile = document.createElement("div");
-      workTile.className = "tile tile-work";
+      workTile.className = "tile tile-add is-run";
+      workTile.dataset.work = "1";
       workTile.setAttribute("aria-busy", "true");
-      const inner = document.createElement("div");
-      inner.className = "tile-work-inner";
-      const step = document.createElement("span");
-      step.className = "tile-work-step";
-      const pct = document.createElement("span");
-      pct.className = "tile-work-pct";
-      inner.appendChild(step);
-      inner.appendChild(pct);
-      workTile.appendChild(inner);
+      const shield = document.createElement("span");
+      shield.className = "tile-shield";
+      const hud = document.createElement("div");
+      hud.className = "tile-job-hud hp is-run";
+      hud.innerHTML =
+        '<div class="hp-label">' +
+        '<span class="hp-text"></span>' +
+        '<span class="hp-alt"><span class="hp-alt-pct"></span></span>' +
+        '<div class="thinking-five hp-think" aria-hidden="true">' +
+        "<span></span><span></span><span></span><span></span><span></span></div></div>" +
+        '<div class="hp-meter"><div class="hp-track"><div class="hp-fill"></div></div></div>';
+      workTile.appendChild(shield);
+      workTile.appendChild(hud);
     }
-    const step = workTile.querySelector(".tile-work-step");
-    const pct = workTile.querySelector(".tile-work-pct");
-    if (step) step.textContent = phase === "tag" ? "標記中..." : "上傳中...";
-    if (pct) pct.textContent = workPctText(percent);
+    workTile.classList.toggle("is-run", running);
+    const hud = workTile.querySelector(".tile-job-hud");
+    if (hud) {
+      if (phase === "tag") hud.dataset.kind = "tag";
+      else delete hud.dataset.kind;
+      hud.classList.toggle("is-run", running);
+      const text = hud.querySelector(".hp-text");
+      const think = hud.querySelector(".thinking-five");
+      const meter = hud.querySelector(".hp-meter");
+      const fill = hud.querySelector(".hp-fill");
+      const alt = hud.querySelector(".hp-alt");
+      const altPct = hud.querySelector(".hp-alt-pct");
+      if (text) text.textContent = phase === "tag" ? "標記中..." : "上傳中...";
+      if (think) think.hidden = !running;
+      if (meter) meter.hidden = !running;
+      if (fill) fill.style.width = pct + "%";
+      if (alt) alt.hidden = !running;
+      if (altPct) altPct.textContent = pct + "%";
+    }
     if (workTile.parentNode !== feed) {
-      const anchor = feed.querySelector(".tile:not(.tile-work), .feed-month, .trash-bar");
+      const anchor = feed.querySelector(".feed-month, .trash-bar, .tile:not([data-work])");
       if (anchor) feed.insertBefore(workTile, anchor);
       else feed.appendChild(workTile);
     }

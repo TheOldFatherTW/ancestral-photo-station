@@ -1007,6 +1007,7 @@
     };
     const job = p.tag || {};
     const tagRun = job.state === "running";
+    const localTag = tagRun && !!(local && (local.done || local.info));
     const tagView = {
       running: tagRun,
       done: false,
@@ -1032,13 +1033,14 @@
     if (liquid) {
       liquid.hidden = !liquidOn;
       liquid.style.setProperty("--fill", fill + "%");
-      liquid.classList.toggle("is-local", localRun);
+      liquid.classList.toggle("is-local", localRun || localTag || localTail);
     }
     const think = hud.querySelector(".cab-cover > .thinking-five");
     if (think) think.hidden = !liquidOn;
     const cap = hud.querySelector(".cab-caption");
-    if (showRun || localTail) paintCap(cap, backupView, "");
+    if (localRun) paintCap(cap, backupView, "");
     else if (tagRun) paintCap(cap, tagView, "");
+    else if (localTail) paintCap(cap, backupView, "");
     else paintCap(cap, null, selectLine);
     const box = settingsWrap || document.getElementById("album-settings");
     const menu = document.querySelector(".settings-menu");

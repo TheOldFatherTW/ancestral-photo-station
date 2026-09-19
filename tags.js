@@ -29,6 +29,7 @@
   let faceCtrl = null;
   let faceCube = null;
   let selectedTag = null;
+  let selectedBBox = null;
   let pickerRefresh = function () {};
   let batchSheet = null;
   let listSheet = null;
@@ -1571,6 +1572,7 @@
     }
 
     function askRetagChoice(src, dst) {
+      const box = selectedBBox ? selectedBBox.slice() : null;
       const mask = document.createElement("div");
       mask.className = "batch-tag-mask retag-choice-mask";
       const card = document.createElement("div");
@@ -1598,7 +1600,7 @@
       const coverAll = document.createElement("input");
       coverAll.type = "checkbox";
       coverAll.setAttribute("role", "switch");
-      coverAll.checked = true;
+      coverAll.checked = false;
       const coverSw = document.createElement("span");
       coverSw.className = "ask-sw";
       coverLab.appendChild(coverName);
@@ -1618,8 +1620,10 @@
       go.addEventListener("click", function () {
         if (!coverAll.checked) {
           shut();
+          const body = { action: "retag_on_photo", id: src.id, into: dst.id };
+          if (box) body.bbox = box;
           runChange(
-            { action: "retag_on_photo", id: src.id, into: dst.id },
+            body,
             "正在把這張改成 #" + dst.label + "…",
             "這張已改成 #" + dst.label
           );
@@ -1816,7 +1820,7 @@
         askDeleteTag(tag);
       });
       chip.addEventListener("click", function () {
-        highlightFace(tag.id);
+        highlightFace(tag.id, null);
         showChipX();
         if (renaming && renaming.id === tag.id) {
           exitRename();
@@ -1849,7 +1853,6 @@
       if (!label) return;
       const target = renameTarget();
       if (target) {
-        const was = target.label;
         const exact = matches().filter(function (hit) {
           return String(hit.label || "").toLowerCase() === label.toLowerCase();
         });
@@ -1857,10 +1860,12 @@
           askRetagChoice(target, exact[0]);
           return;
         }
+        const body = { action: "retag_on_photo", id: target.id, label: label };
+        if (selectedBBox) body.bbox = selectedBBox.slice();
         runChange(
-          { action: "rename", id: target.id, label: label },
-          "正在把 #" + was + " 改成 #" + label + "…",
-          "已改成 #" + label
+          body,
+          "正在把這張改成 #" + label + "…",
+          "這張已改成 #" + label
         );
         return;
       }
@@ -1905,7 +1910,7 @@
     // The tag sheet and the face boxes are fetched side by side, so whichever
     // lands second must not wipe out boxes the other one already drew.
     if (!keepFaces || shipped.length) paintFaces(shipped);
-    if (selectedTag) highlightFace(selectedTag);
+    if (selectedTag) highlightFace(selectedTag, selectedBBox);
     else photoAsk();
   }
 
@@ -2077,7 +2082,7 @@
         );
         if (!ok) return;
         runChange(
-          { action: "detach", id: face.id },
+          { action: "detach", id: face.id, bbox: face.bbox },
           "正在拿掉 #" + (face.label || "") + "…",
           "已從這張拿掉 #" + (face.label || "")
         );
@@ -2085,13 +2090,13 @@
       box.addEventListener("click", function (ev) {
         ev.preventDefault();
         ev.stopPropagation();
-        highlightFace(face.id);
+        highlightFace(face.id, face.bbox);
       });
       box.appendChild(cap);
       box.appendChild(x);
       layer.appendChild(box);
     });
-    if (selectedTag) highlightFace(selectedTag);
+    if (selectedTag) highlightFace(selectedTag, selectedBBox);
   }
 
   function layoutFaces() {
@@ -2152,11 +2157,25 @@
     layoutFaces();
   }
 
-  function highlightFace(id) {
+  function sameBBox(left, right) {
+    if (!left || !right || left.length < 4 || right.length < 4) return false;
+    for (let i = 0; i < 4; i++) {
+      if (Math.abs(Number(left[i]) - Number(right[i])) > 0.0005) return false;
+    }
+    return true;
+  }
+
+  function highlightFace(id, bbox) {
     selectedTag = id;
+    selectedBBox = bbox ? bbox.slice() : null;
     if (faceLayer) {
-      faceLayer.querySelectorAll(".pswp-face").forEach(function (el) {
-        const on = el.dataset.id === id;
+      faceLayer.querySelectorAll(".pswp-face").forEach(function (el, i) {
+        const face = faceBoxes[i];
+        const on = !!(
+          face &&
+          face.id === id &&
+          (!selectedBBox || sameBBox(face.bbox, selectedBBox))
+        );
         el.classList.toggle("is-on", on);
         const x = el.querySelector(".ins-x");
         if (x) x.hidden = !on;
@@ -2209,6 +2228,7 @@
 
   function loadPhoto(item) {
     selectedTag = null;
+    selectedBBox = null;
     sheetItem = item;
     faceTick += 1;
     cancelFaceLayout();
@@ -2256,6 +2276,7 @@
 
   function closePhoto() {
     selectedTag = null;
+    selectedBBox = null;
     sheetItem = null;
     if (faceCtrl) faceCtrl.abort();
     if (sheet) sheet.hidden = true;
